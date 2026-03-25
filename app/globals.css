@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+/* ── Design tokens ───────────────────────────────────────────── */
+:root {
+  --brand-black:       #0a0a0a;
+  --brand-white:       #f4f3f3;
+  --accent-analysis:   #fe6203;
+  --accent-projects:   #fe43a7;
+  --accent-culture:    #fe43a7;
+
+  /* Story card dimensions (9:16, displayed at ~40% scale) */
+  --card-w: 405px;
+  --card-h: 720px;
+
+  /* Typography scale */
+  --text-headline: 2rem;       /* 32px */
+  --text-body:     1rem;       /* 16px */
+  --text-source:   0.75rem;    /* 12px */
+  --text-logo:     1.125rem;   /* 18px */
+
+  /* Spacing inside card */
+  --card-pad: 28px;
+  --accent-border: 3px;
+}
+
+@theme inline {
+  --color-brand-black:      var(--brand-black);
+  --color-brand-white:      var(--brand-white);
+  --color-accent-analysis:  var(--accent-analysis);
+  --color-accent-projects:  var(--accent-projects);
+  --color-accent-culture:   var(--accent-culture);
+  --font-sans: var(--font-space-grotesk);
+}
+
+/* ── Base ────────────────────────────────────────────────────── */
+html, body {
+  background: var(--brand-black);
+  color: var(--brand-white);
+  min-height: 100%;
+}
+
+body {
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Story card ──────────────────────────────────────────────── */
+.story-card {
+  width: var(--card-w);
+  height: var(--card-h);
+  position: relative;
+  border-radius: 24px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.story-content {
+  position: absolute;
+  inset: 0;
+  background: var(--brand-black);
+  display: flex;
+  flex-direction: column;
+  padding: var(--card-pad);
+}
