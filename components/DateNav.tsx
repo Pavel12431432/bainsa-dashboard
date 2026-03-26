@@ -26,6 +26,8 @@ const arrowStyle: React.CSSProperties = {
 
 export default function DateNav({ date }: Props) {
   const router = useRouter();
+  const today = new Date().toISOString().slice(0, 10);
+  const isToday = date === today;
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
@@ -38,6 +40,21 @@ export default function DateNav({ date }: Props) {
       <button style={arrowStyle} onClick={() => router.push(`/stories/${stepDate(date, 1)}`)}>
         →
       </button>
+      {!isToday && (
+        <button
+          onClick={() => router.push(`/stories/${today}`)}
+          style={{
+            ...arrowStyle,
+            fontSize: "0.65rem",
+            fontWeight: 600,
+            letterSpacing: "0.04em",
+            opacity: 0.35,
+            padding: "4px 8px",
+          }}
+        >
+          TODAY
+        </button>
+      )}
     </div>
   );
 }

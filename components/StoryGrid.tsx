@@ -90,13 +90,11 @@ export default function StoryGrid({ date, initialStories, initialApprovals }: Pr
                 )}
               </div>
 
-              {/* Story title */}
-              <p style={{ color: "#f4f3f3", fontSize: "0.8rem", opacity: 0.5, margin: 0, lineHeight: 1.3 }}>
-                {story.index}. {story.title}
-              </p>
-
-              {/* Compliance */}
-              <div style={{ minHeight: "22px" }}>
+              {/* Title + compliance pinned above buttons */}
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: "8px" }}>
+                <p style={{ color: "#f4f3f3", fontSize: "0.8rem", opacity: 0.5, margin: 0, lineHeight: 1.3 }}>
+                  {story.index}. {story.title}
+                </p>
                 <ComplianceBadge result={compliance} />
               </div>
 

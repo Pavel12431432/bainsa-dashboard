@@ -1,19 +1,9 @@
 import { readFileSync, existsSync } from "fs";
-import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
 import { parseStories } from "@/lib/parseStories";
 import { readApprovals } from "@/lib/approvals";
-import { COOKIE_NAME } from "@/lib/auth";
 import StoryGrid from "@/components/StoryGrid";
 import DateNav from "@/components/DateNav";
 import AgentDrawer from "@/components/AgentDrawer";
-
-async function logout() {
-  "use server";
-  const jar = await cookies();
-  jar.delete(COOKIE_NAME);
-  redirect("/login");
-}
 
 interface Props {
   params: Promise<{ date: string }>;
@@ -50,24 +40,20 @@ export default async function StoriesPage({ params }: Props) {
           <span style={{ fontSize: "1rem", fontWeight: 600, color: "#f4f3f3", letterSpacing: "0.08em" }}>
             BAINSA
           </span>
-          <form action={logout}>
-            <button
-              type="submit"
-              style={{
-                background: "none", border: "none", color: "#f4f3f3",
-                opacity: 0.25, fontSize: "0.7rem", fontWeight: 600,
-                fontFamily: "inherit", letterSpacing: "0.06em",
-                cursor: "pointer", padding: 0,
-              }}
-            >
-              LOGOUT
-            </button>
-          </form>
+          <a
+            href="/api/auth/logout"
+            style={{
+              color: "#f4f3f3", opacity: 0.25, fontSize: "0.7rem", fontWeight: 600,
+              fontFamily: "inherit", letterSpacing: "0.06em", textDecoration: "none",
+            }}
+          >
+            LOGOUT
+          </a>
         </div>
 
         <DateNav date={date} />
 
-        <AgentDrawer />
+        <AgentDrawer date={date} />
       </header>
 
       {/* Content */}
