@@ -62,7 +62,7 @@ function renderMarkdown(text: string) {
   });
 }
 
-export default function AgentDrawer({ date }: { date: string }) {
+export default function AgentDrawer({ date, className }: { date: string; className?: string }) {
   const [open, setOpen] = useState(false);
   const [agent, setAgent] = useState<Agent | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
@@ -88,7 +88,7 @@ export default function AgentDrawer({ date }: { date: string }) {
   return (
     <>
       {/* Header buttons */}
-      <div style={{ display: "flex", gap: "10px" }}>
+      <div className={className} style={{ display: "flex", gap: "10px" }}>
         {(["MARCO", "SOFIA"] as Agent[]).map((a) => (
           <button
             key={a}
@@ -118,7 +118,7 @@ export default function AgentDrawer({ date }: { date: string }) {
 
       {/* Drawer */}
       <div style={{
-        position: "fixed", top: 0, right: 0, bottom: 0, width: "400px",
+        position: "fixed", top: 0, right: 0, bottom: 0, width: "min(400px, 100vw)",
         background: "#111", borderLeft: "1px solid #1f1f1f",
         zIndex: 50, display: "flex", flexDirection: "column",
         transform: open ? "translateX(0)" : "translateX(100%)",

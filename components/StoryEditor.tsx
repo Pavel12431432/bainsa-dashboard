@@ -59,9 +59,20 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
         padding: "24px",
       }}
     >
+      <style>{`
+        .editor-panel { flex-direction: row; }
+        .editor-preview { border-right: 1px solid #1a1a1a; }
+        @media (max-width: 700px) {
+          .editor-panel { flex-direction: column !important; }
+          .editor-preview { display: none !important; }
+          .editor-form { padding: 20px !important; }
+        }
+      `}</style>
+
       {/* Modal panel — stop click propagation so backdrop doesn't close it */}
       <div
         onClick={(e) => e.stopPropagation()}
+        className="editor-panel"
         style={{
           background: "#111",
           border: "1px solid #222",
@@ -75,6 +86,7 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
       >
         {/* Left: live preview */}
         <div
+          className="editor-preview"
           style={{
             padding: "32px",
             background: "#0d0d0d",
@@ -82,7 +94,6 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            borderRight: "1px solid #1a1a1a",
             flexShrink: 0,
           }}
         >
@@ -91,6 +102,7 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
 
         {/* Right: edit form */}
         <div
+          className="editor-form"
           style={{
             flex: 1,
             padding: "32px",

@@ -22,13 +22,39 @@ export default async function StoriesPage({ params }: Props) {
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", padding: "0" }}>
+      <style>{`
+        @media (max-width: 600px) {
+          .dash-header {
+            display: grid !important;
+            grid-template-columns: auto 1fr;
+            gap: 8px 0 !important;
+            padding: 12px 16px !important;
+          }
+          .dash-header-left {
+            grid-column: 1;
+            grid-row: 1;
+          }
+          .dash-header-nav {
+            grid-column: 2;
+            grid-row: 1;
+            justify-self: end;
+          }
+          .dash-header-agents {
+            grid-column: 1 / -1;
+            grid-row: 2;
+          }
+        }
+      `}</style>
+
       {/* Header */}
       <header
+        className="dash-header"
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "20px 40px",
+          gap: "12px",
+          padding: "16px 20px",
           borderBottom: "1px solid #1a1a1a",
           position: "sticky",
           top: 0,
@@ -36,7 +62,7 @@ export default async function StoriesPage({ params }: Props) {
           zIndex: 10,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+        <div className="dash-header-left" style={{ display: "flex", alignItems: "center", gap: "16px" }}>
           <span style={{ fontSize: "1rem", fontWeight: 600, color: "#f4f3f3", letterSpacing: "0.08em" }}>
             BAINSA
           </span>
@@ -51,13 +77,13 @@ export default async function StoriesPage({ params }: Props) {
           </a>
         </div>
 
-        <DateNav date={date} />
+        <DateNav date={date} className="dash-header-nav" />
 
-        <AgentDrawer date={date} />
+        <AgentDrawer date={date} className="dash-header-agents" />
       </header>
 
       {/* Content */}
-      <main style={{ padding: "40px" }}>
+      <main style={{ padding: "20px" }}>
         <div style={{ marginBottom: "32px" }}>
           <h1 style={{ fontSize: "1.25rem", fontWeight: 600, color: "#f4f3f3", margin: 0 }}>
             Stories

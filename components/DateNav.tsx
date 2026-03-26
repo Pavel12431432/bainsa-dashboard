@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 
 interface Props {
   date: string; // "YYYY-MM-DD"
+  className?: string;
 }
 
 function stepDate(date: string, days: number): string {
@@ -24,13 +25,13 @@ const arrowStyle: React.CSSProperties = {
   lineHeight: 1,
 };
 
-export default function DateNav({ date }: Props) {
+export default function DateNav({ date, className }: Props) {
   const router = useRouter();
   const today = new Date().toISOString().slice(0, 10);
   const isToday = date === today;
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+    <div className={className} style={{ display: "flex", alignItems: "center", gap: "4px" }}>
       <button style={arrowStyle} onClick={() => router.push(`/stories/${stepDate(date, -1)}`)}>
         ←
       </button>

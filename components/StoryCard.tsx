@@ -17,6 +17,7 @@ export default function StoryCard({ story, scale = 0.72 }: Props) {
     <div
       style={{
         width: displayW,
+        maxWidth: "100%",
         height: displayH,
         position: "relative",
         borderRadius: 24 * scale,

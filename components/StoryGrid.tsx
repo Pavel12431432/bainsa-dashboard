@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Story, ApprovalState } from "@/types";
 import { checkCompliance } from "@/lib/compliance";
 import StoryCard from "./StoryCard";
@@ -17,6 +17,23 @@ export default function StoryGrid({ date, initialStories, initialApprovals }: Pr
   const [stories, setStories] = useState<Story[]>(initialStories);
   const [approvals, setApprovals] = useState<ApprovalState>(initialApprovals);
   const [editing, setEditing] = useState<Story | null>(null);
+  const [cardScale, setCardScale] = useState(0.72);
+
+  useEffect(() => {
+    const update = () => {
+      const w = window.innerWidth;
+      if (w < 600) {
+        setCardScale(0.8);
+      } else {
+        // Match the 4-column CSS grid: (viewport - 40px padding - 3 * 32px gaps) / 4 cols
+        const colWidth = (w - 40 - 3 * 32) / 4;
+        setCardScale(Math.min(colWidth / 405, 1));
+      }
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
 
   async function handleApprove(index: number, action: "approve" | "reject" | "clear") {
     const res = await fetch(`/api/stories/${date}/${index}/approve`, {
@@ -44,6 +61,13 @@ export default function StoryGrid({ date, initialStories, initialApprovals }: Pr
 
   return (
     <>
+      <style>{`
+        .story-grid { grid-template-columns: repeat(4, 1fr); }
+        @media (max-width: 900px) {
+          .story-grid { grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); }
+        }
+      `}</style>
+
       {editing && (
         <StoryEditor
           story={editing}
@@ -54,9 +78,9 @@ export default function StoryGrid({ date, initialStories, initialApprovals }: Pr
       )}
 
       <div
+        className="story-grid"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
           gap: "32px",
         }}
       >
@@ -68,8 +92,8 @@ export default function StoryGrid({ date, initialStories, initialApprovals }: Pr
           return (
             <div key={story.index} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               {/* Card */}
-              <div style={{ position: "relative", display: "inline-block" }}>
-                <StoryCard story={story} scale={0.72} />
+              <div style={{ position: "relative", display: "inline-block", alignSelf: "center" }}>
+                <StoryCard story={story} scale={cardScale} />
 
                 {/* Approval overlay */}
                 {approved && (
