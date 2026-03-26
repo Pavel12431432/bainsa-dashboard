@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFileSync, existsSync } from "fs";
+import { readFile } from "fs/promises";
 import { parseStories } from "@/lib/parseStories";
 import { readApprovals } from "@/lib/approvals";
+import { fileExists } from "@/lib/fs";
 
 export async function GET(
   _req: NextRequest,
@@ -11,13 +12,14 @@ export async function GET(
   const storiesPath = process.env.STORIES_PATH ?? "";
   const filePath = `${storiesPath}/${date}.md`;
 
-  if (!existsSync(filePath)) {
+  if (!(await fileExists(filePath))) {
     return NextResponse.json({ stories: [], approvals: { approved: [], rejected: [] } });
   }
 
-  const markdown = readFileSync(filePath, "utf-8");
-  const stories = parseStories(markdown);
-  const approvals = readApprovals(date);
+  const [markdown, approvals] = await Promise.all([
+    readFile(filePath, "utf-8"),
+    readApprovals(date),
+  ]);
 
-  return NextResponse.json({ stories, approvals });
+  return NextResponse.json({ stories: parseStories(markdown), approvals });
 }

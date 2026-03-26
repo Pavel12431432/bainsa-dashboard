@@ -2,12 +2,6 @@
 
 import { Story } from "@/types";
 
-interface Props {
-  story: Story;
-  /** Scale factor — 1 = full 405×720, 0.5 = half size etc. */
-  scale?: number;
-}
-
 function ChevronAccent({ color }: { color: string }) {
   return (
     <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
@@ -24,27 +18,17 @@ function PlusAccent({ color }: { color: string }) {
   );
 }
 
-export default function StoryContent({ story, scale = 1 }: Props) {
+export default function StoryContent({ story }: { story: Story }) {
   const { accentColor, headline, body, sourceTag, cornerAccent } = story;
 
   return (
-    <div
-      className="story-content"
-      style={scale !== 1 ? { transform: `scale(${scale})`, transformOrigin: "top left" } : undefined}
-    >
+    <div className="story-content">
       {/* Top accent border */}
-      <div style={{ height: "3px", background: accentColor, margin: "0 -28px", position: "absolute", top: 0, left: 0, right: 0 }} />
+      <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: accentColor }} />
 
       {/* Header row */}
       <div className="flex items-center justify-between pt-3 mb-auto">
-        <span
-          style={{
-            fontSize: "var(--text-logo)",
-            fontWeight: 600,
-            color: "var(--brand-white)",
-            letterSpacing: "0.08em",
-          }}
-        >
+        <span className="text-[length:var(--text-logo)] font-semibold text-brand-white tracking-[0.08em]">
           BAINSA
         </span>
         {cornerAccent === "+" ? (
@@ -54,52 +38,26 @@ export default function StoryContent({ story, scale = 1 }: Props) {
         )}
       </div>
 
-      {/* Spacer — pushes headline to upper-middle */}
-      <div style={{ flex: "1 0 60px" }} />
+      {/* Spacer */}
+      <div className="grow-0 shrink basis-[60px] flex-[1_0_60px]" />
 
       {/* Headline */}
-      <p
-        style={{
-          fontSize: "var(--text-headline)",
-          fontWeight: 600,
-          color: "var(--brand-white)",
-          lineHeight: 1.15,
-          margin: 0,
-          textAlign: "left",
-        }}
-      >
+      <p className="text-[length:var(--text-headline)] font-semibold text-brand-white leading-[1.15] m-0 text-left">
         {headline}
       </p>
 
       {/* Body */}
-      <p
-        style={{
-          fontSize: "var(--text-body)",
-          fontWeight: 400,
-          color: "var(--brand-white)",
-          opacity: 0.7,
-          lineHeight: 1.55,
-          marginTop: "16px",
-          textAlign: "left",
-        }}
-      >
+      <p className="text-[length:var(--text-body)] text-brand-white opacity-70 leading-[1.55] mt-4 text-left">
         {body}
       </p>
 
-      {/* Spacer — pushes source to bottom */}
-      <div style={{ flex: 1 }} />
+      {/* Spacer */}
+      <div className="flex-1" />
 
       {/* Source tag */}
       <p
-        style={{
-          fontSize: "var(--text-source)",
-          fontWeight: 600,
-          color: accentColor,
-          margin: 0,
-          textAlign: "left",
-          letterSpacing: "0.04em",
-          textTransform: "uppercase",
-        }}
+        className="text-[length:var(--text-source)] font-semibold m-0 text-left tracking-[0.04em] uppercase"
+        style={{ color: accentColor }}
       >
         {cornerAccent} {sourceTag}
       </p>

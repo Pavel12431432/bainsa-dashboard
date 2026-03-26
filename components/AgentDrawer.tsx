@@ -26,36 +26,21 @@ function formatTime(iso: string): string {
 
 function renderMarkdown(text: string) {
   return text.split("\n").map((line, i) => {
-    // h1
-    if (line.startsWith("# ")) return (
-      <p key={i} style={{ fontSize: "0.8rem", fontWeight: 700, color: "#f4f3f3", margin: "16px 0 6px" }}>
-        {line.slice(2)}
-      </p>
-    );
-    // h2
-    if (line.startsWith("## ")) return (
-      <p key={i} style={{ fontSize: "0.75rem", fontWeight: 700, color: "#f4f3f3", margin: "14px 0 4px", opacity: 0.9 }}>
-        {line.slice(3)}
-      </p>
-    );
-    // h3
-    if (line.startsWith("### ")) return (
-      <p key={i} style={{ fontSize: "0.7rem", fontWeight: 700, color: "#f4f3f3", margin: "10px 0 2px", opacity: 0.7 }}>
-        {line.slice(4)}
-      </p>
-    );
-    // horizontal rule
-    if (line.startsWith("---")) return (
-      <hr key={i} style={{ border: "none", borderTop: "1px solid #1f1f1f", margin: "10px 0" }} />
-    );
-    // blank line
-    if (line.trim() === "") return <div key={i} style={{ height: "6px" }} />;
-    // bold key: value lines
+    if (line.startsWith("# "))
+      return <p key={i} className="text-[0.8rem] font-bold text-brand-white mt-4 mb-1.5">{line.slice(2)}</p>;
+    if (line.startsWith("## "))
+      return <p key={i} className="text-xs font-bold text-brand-white opacity-90 mt-3.5 mb-1">{line.slice(3)}</p>;
+    if (line.startsWith("### "))
+      return <p key={i} className="text-[0.7rem] font-bold text-brand-white opacity-70 mt-2.5 mb-0.5">{line.slice(4)}</p>;
+    if (line.startsWith("---"))
+      return <hr key={i} className="border-none border-t border-[#1f1f1f] my-2.5" />;
+    if (line.trim() === "")
+      return <div key={i} className="h-1.5" />;
     const boldLine = line.replace(/\*\*(.+?)\*\*/g, (_, m) => `<strong>${m}</strong>`);
     return (
       <p
         key={i}
-        style={{ fontSize: "0.7rem", color: "#f4f3f3", opacity: 0.55, margin: "2px 0", lineHeight: 1.6 }}
+        className="text-[0.7rem] text-brand-white opacity-55 my-0.5 leading-relaxed"
         dangerouslySetInnerHTML={{ __html: boldLine }}
       />
     );
@@ -80,7 +65,7 @@ export default function AgentDrawer({ date, className }: { date: string; classNa
       .then((r) => r.json())
       .then((data) => setStatus(data))
       .finally(() => setLoading(false));
-  }, [open]);
+  }, [open, date]);
 
   const current = agent === "MARCO" ? status?.marco : status?.sofia;
   const label = agent === "MARCO" ? "articles" : "stories";
@@ -88,20 +73,12 @@ export default function AgentDrawer({ date, className }: { date: string; classNa
   return (
     <>
       {/* Header buttons */}
-      <div className={className} style={{ display: "flex", gap: "10px" }}>
+      <div className={`flex gap-2.5 ${className ?? ""}`}>
         {(["MARCO", "SOFIA"] as Agent[]).map((a) => (
           <button
             key={a}
             onClick={() => trigger(a)}
-            style={{
-              padding: "7px 16px", borderRadius: "5px",
-              border: "1px solid #333", background: "transparent",
-              color: "#f4f3f3", opacity: 0.55, fontSize: "0.75rem",
-              fontWeight: 600, fontFamily: "inherit", letterSpacing: "0.04em",
-              cursor: "pointer", transition: "opacity 0.15s",
-            }}
-            onMouseEnter={e => (e.currentTarget.style.opacity = "0.9")}
-            onMouseLeave={e => (e.currentTarget.style.opacity = "0.55")}
+            className="px-4 py-[7px] rounded-[5px] border border-border-mid bg-transparent text-brand-white opacity-55 text-xs font-semibold tracking-[0.04em] cursor-pointer transition-opacity duration-150 hover:opacity-90"
           >
             ▸ {a}
           </button>
@@ -112,35 +89,28 @@ export default function AgentDrawer({ date, className }: { date: string; classNa
       {open && (
         <div
           onClick={() => setOpen(false)}
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 40 }}
+          className="fixed inset-0 bg-black/40 z-40"
         />
       )}
 
       {/* Drawer */}
-      <div style={{
-        position: "fixed", top: 0, right: 0, bottom: 0, width: "min(400px, 100vw)",
-        background: "#111", borderLeft: "1px solid #1f1f1f",
-        zIndex: 50, display: "flex", flexDirection: "column",
-        transform: open ? "translateX(0)" : "translateX(100%)",
-        transition: "transform 0.22s ease",
-      }}>
+      <div
+        className="fixed top-0 right-0 bottom-0 w-[min(400px,100vw)] bg-surface border-l border-[#1f1f1f] z-50 flex flex-col transition-transform duration-[220ms] ease-out"
+        style={{ transform: open ? "translateX(0)" : "translateX(100%)" }}
+      >
         {/* Drawer header */}
-        <div style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "20px 24px", borderBottom: "1px solid #1f1f1f",
-          flexShrink: 0,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#f4f3f3", letterSpacing: "0.08em" }}>
+        <div className="flex items-center justify-between px-6 py-5 border-b border-[#1f1f1f] shrink-0">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs font-semibold text-brand-white tracking-[0.08em]">
               {agent ?? "AGENT"}
             </span>
             {!loading && current && (
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <div style={{
-                  width: "5px", height: "5px", borderRadius: "50%",
-                  background: current.ranToday ? "#22c55e" : "#555",
-                }} />
-                <span style={{ fontSize: "0.65rem", color: "#f4f3f3", opacity: 0.35 }}>
+              <div className="flex items-center gap-1.5">
+                <div
+                  className="w-[5px] h-[5px] rounded-full"
+                  style={{ background: current.ranToday ? "#22c55e" : "#555" }}
+                />
+                <span className="text-[0.65rem] text-brand-white opacity-35">
                   {current.ranToday
                     ? `${current.count} ${label} · ${formatTime(current.lastRun!)}`
                     : "not run today"}
@@ -148,21 +118,22 @@ export default function AgentDrawer({ date, className }: { date: string; classNa
               </div>
             )}
           </div>
-          <button onClick={() => setOpen(false)} style={{
-            background: "none", border: "none", color: "#f4f3f3",
-            opacity: 0.4, cursor: "pointer", fontSize: "1rem",
-            fontFamily: "inherit", padding: "4px",
-          }}>✕</button>
+          <button
+            onClick={() => setOpen(false)}
+            className="bg-transparent border-none text-brand-white opacity-40 cursor-pointer text-base p-1"
+          >
+            ✕
+          </button>
         </div>
 
         {/* Drawer body */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+        <div className="flex-1 overflow-y-auto px-6 py-5">
           {loading && (
-            <p style={{ fontSize: "0.75rem", color: "#f4f3f3", opacity: 0.25 }}>Loading...</p>
+            <p className="text-xs text-brand-white opacity-25">Loading...</p>
           )}
 
           {!loading && current && !current.ranToday && (
-            <p style={{ fontSize: "0.75rem", color: "#f4f3f3", opacity: 0.2 }}>
+            <p className="text-xs text-brand-white opacity-20">
               {agent === "MARCO"
                 ? "No news handoff found for today."
                 : "No stories found for today. Run Marco first."}

@@ -1,37 +1,38 @@
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { readFile, writeFile } from "fs/promises";
 import { ApprovalState } from "@/types";
+import { fileExists } from "@/lib/fs";
 
 function approvalPath(storiesPath: string, date: string): string {
   return `${storiesPath}/${date}.approved.json`;
 }
 
-export function readApprovals(date: string): ApprovalState {
+export async function readApprovals(date: string): Promise<ApprovalState> {
   const storiesPath = process.env.APPROVALS_PATH ?? "";
   const path = approvalPath(storiesPath, date);
-  if (!existsSync(path)) return { approved: [], rejected: [] };
+  if (!(await fileExists(path))) return { approved: [], rejected: [] };
   try {
-    return JSON.parse(readFileSync(path, "utf-8"));
+    return JSON.parse(await readFile(path, "utf-8"));
   } catch {
     return { approved: [], rejected: [] };
   }
 }
 
-export function writeApprovals(date: string, state: ApprovalState): void {
+export async function writeApprovals(date: string, state: ApprovalState): Promise<void> {
   const storiesPath = process.env.APPROVALS_PATH ?? "";
   const path = approvalPath(storiesPath, date);
-  writeFileSync(path, JSON.stringify(state, null, 2), "utf-8");
+  await writeFile(path, JSON.stringify(state, null, 2), "utf-8");
 }
 
-export function setApproval(
+export async function setApproval(
   date: string,
   index: number,
   action: "approve" | "reject" | "clear"
-): ApprovalState {
-  const state = readApprovals(date);
+): Promise<ApprovalState> {
+  const state = await readApprovals(date);
   state.approved = state.approved.filter((i) => i !== index);
   state.rejected = state.rejected.filter((i) => i !== index);
   if (action === "approve") state.approved.push(index);
   if (action === "reject") state.rejected.push(index);
-  writeApprovals(date, state);
+  await writeApprovals(date, state);
   return state;
 }

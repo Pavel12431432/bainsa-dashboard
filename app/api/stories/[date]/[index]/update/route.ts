@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { readFile, writeFile } from "fs/promises";
 import { replaceStory } from "@/lib/serializeStories";
+import { fileExists } from "@/lib/fs";
 import { Story } from "@/types";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -23,18 +24,18 @@ export async function POST(
   const storiesPath = process.env.STORIES_PATH ?? "";
   const filePath = `${storiesPath}/${date}.md`;
 
-  if (!existsSync(filePath)) {
+  if (!(await fileExists(filePath))) {
     return NextResponse.json({ error: "File not found" }, { status: 404 });
   }
 
   const updates: Partial<Story> = await req.json();
-  const markdown = readFileSync(filePath, "utf-8");
+  const markdown = await readFile(filePath, "utf-8");
 
   const updated = replaceStory(markdown, {
     ...updates,
     index: parseInt(index, 10),
   } as Story);
 
-  writeFileSync(filePath, updated, "utf-8");
+  await writeFile(filePath, updated, "utf-8");
   return NextResponse.json({ ok: true });
 }

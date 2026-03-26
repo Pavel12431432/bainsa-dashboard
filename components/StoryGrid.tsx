@@ -13,6 +13,8 @@ interface Props {
   initialApprovals: ApprovalState;
 }
 
+const actionBtn = "flex-1 py-[7px] rounded-[5px] text-xs font-semibold tracking-[0.04em] cursor-pointer";
+
 export default function StoryGrid({ date, initialStories, initialApprovals }: Props) {
   const [stories, setStories] = useState<Story[]>(initialStories);
   const [approvals, setApprovals] = useState<ApprovalState>(initialApprovals);
@@ -22,10 +24,9 @@ export default function StoryGrid({ date, initialStories, initialApprovals }: Pr
   useEffect(() => {
     const update = () => {
       const w = window.innerWidth;
-      if (w < 600) {
+      if (w < 640) {
         setCardScale(0.8);
       } else {
-        // Match the 4-column CSS grid: (viewport - 40px padding - 3 * 32px gaps) / 4 cols
         const colWidth = (w - 40 - 3 * 32) / 4;
         setCardScale(Math.min(colWidth / 405, 1));
       }
@@ -53,7 +54,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals }: Pr
 
   if (stories.length === 0) {
     return (
-      <div style={{ textAlign: "left", color: "#f4f3f3", opacity: 0.4, padding: "48px 0" }}>
+      <div className="text-left text-brand-white opacity-40 py-12">
         No stories for this date — run Sofia to generate.
       </div>
     );
@@ -61,13 +62,6 @@ export default function StoryGrid({ date, initialStories, initialApprovals }: Pr
 
   return (
     <>
-      <style>{`
-        .story-grid { grid-template-columns: repeat(4, 1fr); }
-        @media (max-width: 900px) {
-          .story-grid { grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); }
-        }
-      `}</style>
-
       {editing && (
         <StoryEditor
           story={editing}
@@ -77,87 +71,61 @@ export default function StoryGrid({ date, initialStories, initialApprovals }: Pr
         />
       )}
 
-      <div
-        className="story-grid"
-        style={{
-          display: "grid",
-          gap: "32px",
-        }}
-      >
+      <div className="grid gap-8 grid-cols-4 max-lg:grid-cols-[repeat(auto-fill,minmax(min(280px,100%),1fr))]">
         {stories.map((story) => {
           const compliance = checkCompliance(story);
           const approved = approvals.approved.includes(story.index);
           const rejected = approvals.rejected.includes(story.index);
 
           return (
-            <div key={story.index} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <div key={story.index} className="flex flex-col gap-3">
               {/* Card */}
-              <div style={{ position: "relative", display: "inline-block", alignSelf: "center" }}>
+              <div className="relative inline-block self-center">
                 <StoryCard story={story} scale={cardScale} />
 
-                {/* Approval overlay */}
                 {approved && (
-                  <div style={{
-                    position: "absolute", inset: 0, borderRadius: "16px",
-                    border: "2px solid #22c55e", pointerEvents: "none",
-                  }} />
+                  <div className="absolute inset-0 rounded-2xl border-2 border-success pointer-events-none" />
                 )}
                 {rejected && (
-                  <div style={{
-                    position: "absolute", inset: 0, borderRadius: "16px",
-                    border: "2px solid #ef4444",
-                    background: "rgba(0,0,0,0.45)", pointerEvents: "none",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                  }}>
-                    <span style={{ color: "#ef4444", fontSize: "1.5rem", fontWeight: 700 }}>✕</span>
+                  <div className="absolute inset-0 rounded-2xl border-2 border-danger bg-black/45 pointer-events-none flex items-center justify-center">
+                    <span className="text-danger text-2xl font-bold">✕</span>
                   </div>
                 )}
               </div>
 
-              {/* Title + compliance pinned above buttons */}
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: "8px" }}>
-                <p style={{ color: "#f4f3f3", fontSize: "0.8rem", opacity: 0.5, margin: 0, lineHeight: 1.3 }}>
+              {/* Title + compliance */}
+              <div className="flex-1 flex flex-col justify-end gap-2">
+                <p className="text-brand-white text-[0.8rem] opacity-50 m-0 leading-tight">
                   {story.index}. {story.title}
                 </p>
                 <ComplianceBadge result={compliance} />
               </div>
 
               {/* Action buttons */}
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div className="flex gap-2">
                 <button
                   onClick={() => setEditing(story)}
-                  style={{
-                    flex: 1, padding: "7px 0", borderRadius: "5px",
-                    border: "1px solid #333", background: "transparent",
-                    color: "#f4f3f3", fontSize: "0.75rem", fontWeight: 600,
-                    fontFamily: "inherit", cursor: "pointer", letterSpacing: "0.04em",
-                  }}
+                  className={`${actionBtn} border border-border-mid bg-transparent text-brand-white`}
                 >
                   EDIT
                 </button>
                 <button
                   onClick={() => handleApprove(story.index, approved ? "clear" : "approve")}
-                  style={{
-                    flex: 1, padding: "7px 0", borderRadius: "5px",
-                    border: approved ? "1px solid #22c55e" : "1px solid #333",
-                    background: approved ? "#22c55e18" : "transparent",
-                    color: approved ? "#22c55e" : "#f4f3f3",
-                    fontSize: "0.75rem", fontWeight: 600, fontFamily: "inherit",
-                    cursor: "pointer", letterSpacing: "0.04em",
-                  }}
+                  className={`${actionBtn} border ${
+                    approved
+                      ? "border-success bg-success/10 text-success"
+                      : "border-border-mid bg-transparent text-brand-white"
+                  }`}
                 >
                   {approved ? "✓ APPROVED" : "APPROVE"}
                 </button>
                 <button
                   onClick={() => handleApprove(story.index, rejected ? "clear" : "reject")}
-                  style={{
-                    flex: 1, padding: "7px 0", borderRadius: "5px",
-                    border: rejected ? "1px solid #ef4444" : "1px solid #333",
-                    background: rejected ? "#ef444418" : "transparent",
-                    color: rejected ? "#ef4444" : "#f4f3f3",
-                    fontSize: "0.75rem", fontWeight: 600, fontFamily: "inherit",
-                    cursor: "pointer", letterSpacing: "0.04em",
-                  }}
+                  className={`${actionBtn} border ${
+                    rejected
+                      ? "border-danger bg-danger/10 text-danger"
+                      : "border-border-mid bg-transparent text-brand-white"
+                  }`}
                 >
                   {rejected ? "✕ REJECTED" : "REJECT"}
                 </button>
@@ -166,7 +134,6 @@ export default function StoryGrid({ date, initialStories, initialApprovals }: Pr
           );
         })}
       </div>
-
     </>
   );
 }

@@ -8,15 +8,15 @@
   --accent-projects:   #fe43a7;
   --accent-culture:    #fe43a7;
 
-  /* Story card dimensions (9:16, displayed at ~40% scale) */
+  /* Story card dimensions (9:16) */
   --card-w: 405px;
   --card-h: 720px;
 
   /* Typography scale */
-  --text-headline: 2rem;       /* 32px */
-  --text-body:     1rem;       /* 16px */
-  --text-source:   0.75rem;    /* 12px */
-  --text-logo:     1.125rem;   /* 18px */
+  --text-headline: 2rem;
+  --text-body:     1rem;
+  --text-source:   0.75rem;
+  --text-logo:     1.125rem;
 
   /* Spacing inside card */
   --card-pad: 28px;
@@ -29,6 +29,13 @@
   --color-accent-analysis:  var(--accent-analysis);
   --color-accent-projects:  var(--accent-projects);
   --color-accent-culture:   var(--accent-culture);
+  --color-surface:          #111111;
+  --color-border:           #1a1a1a;
+  --color-border-light:     #222222;
+  --color-border-mid:       #333333;
+  --color-muted:            #666666;
+  --color-success:          #22c55e;
+  --color-danger:           #ef4444;
   --font-sans: var(--font-space-grotesk);
 }
 
@@ -61,4 +68,19 @@ body {
   display: flex;
   flex-direction: column;
   padding: var(--card-pad);
+}
+
+/* ── Login button (activates when password field has content) ── */
+.login-btn {
+  background: var(--color-border-mid);
+  color: var(--color-muted);
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.login-form:has(input[type="password"]:not(:placeholder-shown)) .login-btn {
+  background: var(--brand-white);
+  color: var(--brand-black);
+  cursor: pointer;
+  pointer-events: auto;
 }

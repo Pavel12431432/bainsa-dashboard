@@ -19,6 +19,6 @@ export async function POST(
   }
 
   const { action } = await req.json();
-  const state = setApproval(date, parseInt(index, 10), action);
+  const state = await setApproval(date, parseInt(index, 10), action);
   return NextResponse.json({ ok: true, approvals: state });
 }

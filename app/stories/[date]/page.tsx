@@ -1,6 +1,7 @@
-import { readFileSync, existsSync } from "fs";
+import { readFile } from "fs/promises";
 import { parseStories } from "@/lib/parseStories";
 import { readApprovals } from "@/lib/approvals";
+import { fileExists } from "@/lib/fs";
 import StoryGrid from "@/components/StoryGrid";
 import DateNav from "@/components/DateNav";
 import AgentDrawer from "@/components/AgentDrawer";
@@ -14,81 +15,38 @@ export default async function StoriesPage({ params }: Props) {
   const storiesPath = process.env.STORIES_PATH ?? "";
   const filePath = `${storiesPath}/${date}.md`;
 
-  const stories = existsSync(filePath)
-    ? parseStories(readFileSync(filePath, "utf-8"))
-    : [];
-
-  const approvals = readApprovals(date);
+  const exists = await fileExists(filePath);
+  const [stories, approvals] = await Promise.all([
+    exists ? readFile(filePath, "utf-8").then(parseStories) : Promise.resolve([]),
+    readApprovals(date),
+  ]);
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0a0a0a", padding: "0" }}>
-      <style>{`
-        @media (max-width: 600px) {
-          .dash-header {
-            display: grid !important;
-            grid-template-columns: auto 1fr;
-            gap: 8px 0 !important;
-            padding: 12px 16px !important;
-          }
-          .dash-header-left {
-            grid-column: 1;
-            grid-row: 1;
-          }
-          .dash-header-nav {
-            grid-column: 2;
-            grid-row: 1;
-            justify-self: end;
-          }
-          .dash-header-agents {
-            grid-column: 1 / -1;
-            grid-row: 2;
-          }
-        }
-      `}</style>
-
+    <div className="min-h-screen bg-brand-black">
       {/* Header */}
-      <header
-        className="dash-header"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "12px",
-          padding: "16px 20px",
-          borderBottom: "1px solid #1a1a1a",
-          position: "sticky",
-          top: 0,
-          background: "#0a0a0a",
-          zIndex: 10,
-        }}
-      >
-        <div className="dash-header-left" style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <span style={{ fontSize: "1rem", fontWeight: 600, color: "#f4f3f3", letterSpacing: "0.08em" }}>
+      <header className="flex items-center justify-between gap-3 px-5 py-4 border-b border-border sticky top-0 bg-brand-black z-10 max-sm:grid max-sm:grid-cols-[auto_1fr] max-sm:gap-y-2 max-sm:gap-x-0 max-sm:px-4 max-sm:py-3">
+        <div className="flex items-center gap-4 max-sm:col-start-1 max-sm:row-start-1">
+          <span className="text-base font-semibold text-brand-white tracking-[0.08em]">
             BAINSA
           </span>
           <a
             href="/api/auth/logout"
-            style={{
-              color: "#f4f3f3", opacity: 0.25, fontSize: "0.7rem", fontWeight: 600,
-              fontFamily: "inherit", letterSpacing: "0.06em", textDecoration: "none",
-            }}
+            className="text-brand-white opacity-25 text-[0.7rem] font-semibold tracking-[0.06em] no-underline"
           >
             LOGOUT
           </a>
         </div>
 
-        <DateNav date={date} className="dash-header-nav" />
+        <DateNav date={date} className="max-sm:col-start-2 max-sm:row-start-1 max-sm:justify-self-end" />
 
-        <AgentDrawer date={date} className="dash-header-agents" />
+        <AgentDrawer date={date} className="max-sm:col-span-full max-sm:row-start-2" />
       </header>
 
       {/* Content */}
-      <main style={{ padding: "20px" }}>
-        <div style={{ marginBottom: "32px" }}>
-          <h1 style={{ fontSize: "1.25rem", fontWeight: 600, color: "#f4f3f3", margin: 0 }}>
-            Stories
-          </h1>
-          <p style={{ fontSize: "0.8rem", color: "#f4f3f3", opacity: 0.35, margin: "4px 0 0" }}>
+      <main className="p-5">
+        <div className="mb-8">
+          <h1 className="text-xl font-semibold text-brand-white m-0">Stories</h1>
+          <p className="text-[0.8rem] text-brand-white opacity-35 mt-1">
             {stories.length} {stories.length === 1 ? "story" : "stories"} ·{" "}
             {approvals.approved.length} approved · {approvals.rejected.length} rejected
           </p>

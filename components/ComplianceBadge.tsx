@@ -13,25 +13,14 @@ const checks: { key: keyof Omit<ComplianceResult, "pass">; label: string }[] = [
 
 export default function ComplianceBadge({ result }: Props) {
   const failures = checks.filter(({ key }) => !(result[key] as boolean));
-
-  // All pass — show nothing
   if (failures.length === 0) return null;
 
   return (
-    <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
+    <div className="flex gap-[5px] flex-wrap">
       {failures.map(({ key, label }) => (
         <span
           key={key}
-          style={{
-            fontSize: "0.62rem",
-            fontWeight: 600,
-            letterSpacing: "0.03em",
-            padding: "2px 6px",
-            borderRadius: "3px",
-            background: "transparent",
-            color: "#888",
-            border: "1px solid #333",
-          }}
+          className="text-[0.62rem] font-semibold tracking-[0.03em] px-1.5 py-0.5 rounded-sm bg-transparent text-muted border border-border-mid"
         >
           ✕ {label}
         </span>

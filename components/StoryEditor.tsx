@@ -22,7 +22,6 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
   function update(field: keyof Story, value: string) {
     setDraft((prev) => {
       const next = { ...prev, [field]: value };
-      // Auto-sync accent color when division changes
       if (field === "division" && ACCENT_COLORS[value]) {
         next.accentColor = ACCENT_COLORS[value];
       }
@@ -49,74 +48,26 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
   }
 
   return (
-    /* Backdrop */
     <div
       onClick={onClose}
-      style={{
-        position: "fixed", inset: 0, zIndex: 100,
-        background: "rgba(0,0,0,0.85)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "24px",
-      }}
+      className="fixed inset-0 z-[100] bg-black/85 flex items-center justify-center p-6"
     >
-      <style>{`
-        .editor-panel { flex-direction: row; }
-        .editor-preview { border-right: 1px solid #1a1a1a; }
-        @media (max-width: 700px) {
-          .editor-panel { flex-direction: column !important; }
-          .editor-preview { display: none !important; }
-          .editor-form { padding: 20px !important; }
-        }
-      `}</style>
-
-      {/* Modal panel — stop click propagation so backdrop doesn't close it */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className="editor-panel"
-        style={{
-          background: "#111",
-          border: "1px solid #222",
-          borderRadius: "12px",
-          display: "flex",
-          width: "100%",
-          maxWidth: "900px",
-          maxHeight: "90vh",
-          overflow: "hidden",
-        }}
+        className="bg-surface border border-border-light rounded-xl flex w-full max-w-[900px] max-h-[90vh] overflow-hidden max-md:flex-col"
       >
-        {/* Left: live preview */}
-        <div
-          className="editor-preview"
-          style={{
-            padding: "32px",
-            background: "#0d0d0d",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-          }}
-        >
+        {/* Preview */}
+        <div className="p-8 bg-brand-black flex flex-col items-center justify-center shrink-0 border-r border-border max-md:hidden">
           <StoryCard story={draft} scale={0.72} />
         </div>
 
-        {/* Right: edit form */}
-        <div
-          className="editor-form"
-          style={{
-            flex: 1,
-            padding: "32px",
-            overflowY: "auto",
-            display: "flex",
-            flexDirection: "column",
-            gap: "20px",
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <h2 style={{ fontSize: "0.875rem", fontWeight: 600, color: "#f4f3f3", margin: 0, letterSpacing: "0.06em" }}>
+        {/* Form */}
+        <div className="flex-1 p-8 overflow-y-auto flex flex-col gap-5 max-md:p-5">
+          <div className="flex justify-between items-start">
+            <h2 className="text-sm font-semibold text-brand-white m-0 tracking-[0.06em]">
               EDIT STORY {draft.index}
             </h2>
-            <button onClick={onClose} style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: "1.25rem", lineHeight: 1, padding: 0 }}>
+            <button onClick={onClose} className="bg-transparent border-none text-muted cursor-pointer text-xl leading-none p-0">
               ✕
             </button>
           </div>
@@ -126,7 +77,7 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
               value={draft.headline}
               onChange={(e) => update("headline", e.target.value)}
               rows={2}
-              style={textareaStyle}
+              className="bg-border border border-[#2a2a2a] rounded-[5px] px-3 py-2.5 text-brand-white text-sm leading-normal resize-y outline-none"
             />
             <CharCount value={draft.headline} max={80} />
           </Field>
@@ -136,7 +87,7 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
               value={draft.body}
               onChange={(e) => update("body", e.target.value)}
               rows={4}
-              style={textareaStyle}
+              className="bg-border border border-[#2a2a2a] rounded-[5px] px-3 py-2.5 text-brand-white text-sm leading-normal resize-y outline-none"
             />
             <CharCount value={draft.body} max={240} />
           </Field>
@@ -146,16 +97,16 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
               type="text"
               value={draft.sourceTag}
               onChange={(e) => update("sourceTag", e.target.value)}
-              style={inputStyle}
+              className="bg-border border border-[#2a2a2a] rounded-[5px] px-3 py-2.5 text-brand-white text-sm outline-none w-full"
             />
           </Field>
 
-          <div style={{ display: "flex", gap: "16px" }}>
-            <Field label="DIVISION" style={{ flex: 1 }}>
+          <div className="flex gap-4">
+            <Field label="DIVISION" className="flex-1">
               <select
                 value={draft.division}
                 onChange={(e) => update("division", e.target.value)}
-                style={inputStyle}
+                className="bg-border border border-[#2a2a2a] rounded-[5px] px-3 py-2.5 text-brand-white text-sm outline-none w-full"
               >
                 {DIVISIONS.map((d) => (
                   <option key={d} value={d}>{d}</option>
@@ -163,11 +114,11 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
               </select>
             </Field>
 
-            <Field label="CORNER ACCENT" style={{ flex: 1 }}>
+            <Field label="CORNER ACCENT" className="flex-1">
               <select
                 value={draft.cornerAccent}
                 onChange={(e) => update("cornerAccent", e.target.value as ">" | "+")}
-                style={inputStyle}
+                className="bg-border border border-[#2a2a2a] rounded-[5px] px-3 py-2.5 text-brand-white text-sm outline-none w-full"
               >
                 <option value=">">› Chevron</option>
                 <option value="+">+ Plus</option>
@@ -176,15 +127,25 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
           </div>
 
           {error && (
-            <p style={{ color: "#fe6203", fontSize: "0.8rem", margin: 0 }}>{error}</p>
+            <p className="text-accent-analysis text-[0.8rem] m-0">{error}</p>
           )}
 
-          {/* Action buttons */}
-          <div style={{ display: "flex", gap: "10px", marginTop: "auto", paddingTop: "8px" }}>
-            <button onClick={onClose} style={secondaryBtnStyle}>
+          <div className="flex gap-2.5 mt-auto pt-2">
+            <button
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-[5px] border border-border-mid bg-transparent text-brand-white text-xs font-semibold tracking-[0.06em] cursor-pointer"
+            >
               CANCEL
             </button>
-            <button onClick={handleSave} disabled={saving} style={primaryBtnStyle(saving)}>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className={`flex-[2] py-2.5 rounded-[5px] border-none text-xs font-semibold tracking-[0.06em] ${
+                saving
+                  ? "bg-border-mid text-muted cursor-not-allowed"
+                  : "bg-brand-white text-brand-black cursor-pointer"
+              }`}
+            >
               {saving ? "SAVING..." : "SAVE"}
             </button>
           </div>
@@ -194,10 +155,10 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
   );
 }
 
-function Field({ label, children, style }: { label: string; children: React.ReactNode; style?: React.CSSProperties }) {
+function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "6px", ...style }}>
-      <label style={{ fontSize: "0.65rem", fontWeight: 600, color: "#666", letterSpacing: "0.08em" }}>
+    <div className={`flex flex-col gap-1.5 ${className ?? ""}`}>
+      <label className="text-[0.65rem] font-semibold text-muted tracking-[0.08em]">
         {label}
       </label>
       {children}
@@ -208,63 +169,8 @@ function Field({ label, children, style }: { label: string; children: React.Reac
 function CharCount({ value, max }: { value: string; max: number }) {
   const over = value.length > max;
   return (
-    <span style={{ fontSize: "0.65rem", color: over ? "#fe6203" : "#555", textAlign: "right" }}>
+    <span className={`text-[0.65rem] text-right ${over ? "text-accent-analysis" : "text-[#555]"}`}>
       {value.length}/{max}
     </span>
   );
-}
-
-const textareaStyle: React.CSSProperties = {
-  background: "#1a1a1a",
-  border: "1px solid #2a2a2a",
-  borderRadius: "5px",
-  padding: "10px 12px",
-  color: "#f4f3f3",
-  fontSize: "0.875rem",
-  fontFamily: "inherit",
-  lineHeight: 1.5,
-  resize: "vertical",
-  outline: "none",
-};
-
-const inputStyle: React.CSSProperties = {
-  background: "#1a1a1a",
-  border: "1px solid #2a2a2a",
-  borderRadius: "5px",
-  padding: "10px 12px",
-  color: "#f4f3f3",
-  fontSize: "0.875rem",
-  fontFamily: "inherit",
-  outline: "none",
-  width: "100%",
-};
-
-const secondaryBtnStyle: React.CSSProperties = {
-  flex: 1,
-  padding: "10px",
-  borderRadius: "5px",
-  border: "1px solid #333",
-  background: "transparent",
-  color: "#f4f3f3",
-  fontSize: "0.75rem",
-  fontWeight: 600,
-  fontFamily: "inherit",
-  letterSpacing: "0.06em",
-  cursor: "pointer",
-};
-
-function primaryBtnStyle(disabled: boolean): React.CSSProperties {
-  return {
-    flex: 2,
-    padding: "10px",
-    borderRadius: "5px",
-    border: "none",
-    background: disabled ? "#333" : "#f4f3f3",
-    color: disabled ? "#666" : "#0a0a0a",
-    fontSize: "0.75rem",
-    fontWeight: 600,
-    fontFamily: "inherit",
-    letterSpacing: "0.06em",
-    cursor: disabled ? "not-allowed" : "pointer",
-  };
 }
