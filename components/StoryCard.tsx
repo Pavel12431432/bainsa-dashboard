@@ -1,16 +1,38 @@
 "use client";
 
+import { useRef, useLayoutEffect } from "react";
 import { Story } from "@/types";
 import StoryContent from "./StoryContent";
 
 interface Props {
   story: Story;
-  scale?: number; // explicit scale for editor preview; omit for CSS-only (no CLS)
+  scale?: number; // explicit scale for editor preview; omit for auto-scaling (no CLS)
 }
 
 export default function StoryCard({ story, scale }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scale: measure container width and set transform before the browser paints.
+  // Inner content starts opacity-0 (SSR-safe), then useLayoutEffect reveals it at
+  // the correct scale in one frame — no visible flash or layout shift.
+  useLayoutEffect(() => {
+    if (scale !== undefined) return;
+    const container = containerRef.current;
+    const inner = innerRef.current;
+    if (!container || !inner) return;
+    const update = () => {
+      const s = Math.min(container.clientWidth / 405, 1);
+      inner.style.transform = `scale(${s})`;
+      inner.style.opacity = "1";
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [scale]);
+
   if (scale !== undefined) {
-    // Fixed mode: explicit pixel dimensions, used in editor preview (no CLS concern)
     return (
       <div
         className="relative overflow-hidden shrink-0 bg-brand-black border border-border-light rounded-2xl"
@@ -30,12 +52,10 @@ export default function StoryCard({ story, scale }: Props) {
     );
   }
 
-  // CSS-only mode: card fills its grid column (capped at 405px), no JS, no CLS.
-  // Scaling uses the trig identity: tan(atan2(100cqw, 405px)) produces a
-  // dimensionless ratio (container width / 405), which scale() accepts.
   return (
     <div
-      className="story-card-auto relative overflow-hidden bg-brand-black border border-border-light rounded-2xl"
+      ref={containerRef}
+      className="relative overflow-hidden bg-brand-black border border-border-light rounded-2xl"
       style={{
         width: "100%",
         maxWidth: 405,
@@ -44,7 +64,8 @@ export default function StoryCard({ story, scale }: Props) {
       }}
     >
       <div
-        className="story-card-auto-inner absolute top-0 left-0"
+        ref={innerRef}
+        className="absolute top-0 left-0 opacity-0"
         style={{ width: 405, height: 720, transformOrigin: "top left" }}
       >
         <StoryContent story={story} />
