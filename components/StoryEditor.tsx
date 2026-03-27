@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { Story } from "@/types";
-import { ACCENT_COLORS } from "@/types";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Story, HistoryEntry, ACCENT_COLORS } from "@/types";
+import { apiFetch } from "@/lib/fetch";
 import StoryCard from "./StoryCard";
+import StoryChat from "./StoryChat";
+import StoryFields from "./StoryFields";
+import VersionTimeline from "./VersionTimeline";
 
 interface Props {
   story: Story;
@@ -12,12 +15,125 @@ interface Props {
   onSaved: (updated: Story) => void;
 }
 
-const DIVISIONS = ["Analysis", "Projects", "Culture"] as const;
+// What Sofia proposed but hasn't been accepted/reverted yet
+interface Pending {
+  before: Story;
+  after: Story;
+  changedFields: string[];
+}
+
+function getSessionId(date: string, index: number): string {
+  const key = `sofia-session:${date}:${index}`;
+  let id = localStorage.getItem(key);
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem(key, id);
+  }
+  return id;
+}
+
+function applyUpdates(prev: Story, updates: Partial<Story>): Story {
+  const next = { ...prev };
+  for (const [key, value] of Object.entries(updates)) {
+    if (key in prev && typeof value === "string") {
+      (next as Record<string, unknown>)[key] = value;
+    }
+  }
+  if (updates.division && ACCENT_COLORS[updates.division]) {
+    next.accentColor = ACCENT_COLORS[updates.division];
+  }
+  return next;
+}
+
+function diffFields(a: Story, b: Story): string[] {
+  const fields: string[] = [];
+  if (a.headline !== b.headline) fields.push("headline");
+  if (a.body !== b.body) fields.push("body");
+  if (a.sourceTag !== b.sourceTag) fields.push("source");
+  if (a.division !== b.division) fields.push("division");
+  if (a.cornerAccent !== b.cornerAccent) fields.push("accent");
+  return fields;
+}
+
+function storyEqual(a: Story, b: Story): boolean {
+  return (
+    a.headline === b.headline &&
+    a.body === b.body &&
+    a.sourceTag === b.sourceTag &&
+    a.division === b.division &&
+    a.accentColor === b.accentColor &&
+    a.cornerAccent === b.cornerAccent
+  );
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  headline: "headline",
+  body: "body",
+  source: "source tag",
+  division: "division",
+  accent: "corner accent",
+};
 
 export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
   const [draft, setDraft] = useState<Story>({ ...story });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [tab, setTab] = useState<"fields" | "chat">("fields");
+  const [sessionId, setSessionId] = useState("");
+  const [pending, setPending] = useState<Pending | null>(null);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [viewingIdx, setViewingIdx] = useState<number | null>(null);
+
+  const saved = useRef<Story>({ ...story });
+  const currentBeforeViewing = useRef<Story>({ ...story });
+  const originalRecorded = useRef(false);
+  // Immutable snapshot of what was on disk when the editor was opened.
+  // Used for the "Original" history entry — must not be saved.current, which
+  // saveStory mutates before recordHistory runs.
+  const originalStory = useRef<Story>({ ...story });
+
+  const hasDirtyManualEdits = !pending && viewingIdx === null && !storyEqual(draft, saved.current);
+  const isViewingHistory = viewingIdx !== null;
+
+  const historyUrl = `/api/stories/${date}/${story.index}/history`;
+
+  useEffect(() => {
+    setSessionId(getSessionId(date, story.index));
+  }, [date, story.index]);
+
+  useEffect(() => {
+    fetch(historyUrl)
+      .then((r) => r.json())
+      .then((entries: HistoryEntry[]) => {
+        setHistory(entries);
+        if (entries.length > 0) originalRecorded.current = true;
+      })
+      .catch(() => {});
+  }, [historyUrl]);
+
+  const recordHistory = useCallback(
+    async (s: Story, label: string) => {
+      try {
+        if (!originalRecorded.current) {
+          originalRecorded.current = true;
+          await apiFetch(historyUrl, { story: originalStory.current, label: "Original" });
+        }
+        const res = await apiFetch(historyUrl, { story: s, label });
+        if (res.ok) setHistory(await res.json());
+      } catch {}
+    },
+    [historyUrl],
+  );
+
+  async function saveStory(s: Story): Promise<boolean> {
+    const res = await apiFetch(`/api/stories/${date}/${s.index}/update`, s);
+    if (res.ok) {
+      saved.current = { ...s };
+      onSaved(s);
+    }
+    return res.ok;
+  }
 
   function update(field: keyof Story, value: string) {
     setDraft((prev) => {
@@ -29,17 +145,68 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
     });
   }
 
+  function handleChatUpdate(updates: Partial<Story>) {
+    const before = { ...draft };
+    const after = applyUpdates(before, updates);
+    const changedFields = diffFields(before, after);
+    if (changedFields.length === 0) return;
+    setPending({ before, after, changedFields });
+    setDraft(after);
+  }
+
+  async function handleAccept() {
+    if (!pending) return;
+    const accepted = { ...draft };
+    const changedLabel = pending.changedFields.map((f) => FIELD_LABELS[f] ?? f).join(", ");
+    setPending(null);
+    if (await saveStory(accepted)) {
+      await recordHistory(accepted, `Sofia: ${changedLabel}`);
+    }
+  }
+
+  function handleRevert() {
+    if (!pending) return;
+    setDraft(pending.before);
+    setPending(null);
+  }
+
+  function handleReset() {
+    const key = `sofia-session:${date}:${story.index}`;
+    const id = crypto.randomUUID();
+    localStorage.setItem(key, id);
+    setSessionId(id);
+  }
+
+  function handleViewVersion(idx: number) {
+    if (viewingIdx === null) {
+      currentBeforeViewing.current = { ...draft };
+    }
+    setViewingIdx(idx);
+    setDraft({ ...history[idx].story });
+  }
+
+  async function handleRestoreVersion() {
+    if (viewingIdx === null) return;
+    const restored = { ...draft };
+    const restoredLabel = history[viewingIdx]?.label ?? "previous version";
+    setViewingIdx(null);
+    if (await saveStory(restored)) {
+      currentBeforeViewing.current = restored;
+      await recordHistory(restored, `Restored: ${restoredLabel}`);
+    }
+  }
+
+  function handleBackToCurrent() {
+    setDraft({ ...currentBeforeViewing.current });
+    setViewingIdx(null);
+  }
+
   async function handleSave() {
     setSaving(true);
     setError("");
     try {
-      const res = await fetch(`/api/stories/${date}/${draft.index}/update`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Requested-With": "fetch" },
-        body: JSON.stringify(draft),
-      });
-      if (!res.ok) throw new Error("Save failed");
-      onSaved(draft);
+      if (!(await saveStory(draft))) throw new Error("Save failed");
+      await recordHistory(draft, "Manual edit");
       onClose();
     } catch {
       setError("Save failed — try again.");
@@ -47,101 +214,120 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
     }
   }
 
+  const tabBtn =
+    "flex-1 py-2.5 text-[0.65rem] font-semibold tracking-[0.08em] bg-transparent border-none cursor-pointer";
+
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-[100] bg-black/85 flex items-center justify-center p-6"
+      className="fixed inset-0 z-[100] bg-black/85 flex items-center justify-center p-6 max-md:p-0"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-surface border border-border-light rounded-xl flex w-full max-w-[900px] max-h-[90vh] overflow-hidden max-md:flex-col"
+        className="bg-surface border border-border-light rounded-xl flex w-full max-w-[1200px] max-h-[90vh] overflow-hidden max-md:flex-col max-md:max-w-none max-md:max-h-none max-md:h-full max-md:rounded-none max-md:border-none"
       >
-        {/* Preview */}
-        <div className="p-8 bg-brand-black flex flex-col items-center justify-center shrink-0 border-r border-border max-md:hidden">
+        {/* Preview — hidden below lg */}
+        <div className="p-8 bg-brand-black flex flex-col items-center justify-center shrink-0 border-r border-border max-lg:hidden">
           <StoryCard story={draft} scale={0.72} />
         </div>
 
+        {/* Mobile tab bar */}
+        <div className="hidden max-md:flex items-center border-b border-border-light shrink-0">
+          <button
+            onClick={() => setTab("fields")}
+            className={`${tabBtn} ${tab === "fields" ? "text-brand-white border-b-2 border-brand-white" : "text-muted"}`}
+          >
+            FIELDS
+          </button>
+          <button
+            onClick={() => setTab("chat")}
+            className={`${tabBtn} ${tab === "chat" ? "text-brand-white border-b-2 border-brand-white" : "text-muted"}`}
+          >
+            SOFIA
+          </button>
+          <button
+            onClick={onClose}
+            className="bg-transparent border-none text-muted cursor-pointer text-lg px-4 py-2"
+          >
+            ✕
+          </button>
+        </div>
+
         {/* Form */}
-        <div className="flex-1 p-8 overflow-y-auto flex flex-col gap-5 max-md:p-5">
+        <div
+          className={`flex-1 p-8 overflow-y-auto flex flex-col gap-5 min-w-0 max-md:p-5 ${tab === "chat" ? "max-md:hidden" : ""}`}
+        >
           <div className="flex justify-between items-start">
             <h2 className="text-sm font-semibold text-brand-white m-0 tracking-[0.06em]">
               EDIT STORY {draft.index}
             </h2>
-            <button onClick={onClose} className="bg-transparent border-none text-muted cursor-pointer text-xl leading-none p-0">
-              ✕
-            </button>
+            <div className="flex items-center gap-3">
+              {history.length > 0 && !isViewingHistory && (
+                <button
+                  onClick={() => setShowHistory((v) => !v)}
+                  className="text-[0.65rem] font-semibold text-muted tracking-[0.04em] bg-transparent border-none cursor-pointer hover:text-brand-white"
+                >
+                  {showHistory ? "HIDE HISTORY" : `HISTORY (${history.length})`}
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="bg-transparent border-none text-muted cursor-pointer text-xl leading-none p-0 max-md:hidden"
+              >
+                ✕
+              </button>
+            </div>
           </div>
 
-          <Field label="HEADLINE">
-            <textarea
-              value={draft.headline}
-              onChange={(e) => update("headline", e.target.value)}
-              rows={2}
-              className="bg-border border border-[#2a2a2a] rounded-[5px] px-3 py-2.5 text-brand-white text-sm leading-normal resize-y outline-none"
+          {(showHistory || isViewingHistory) && (
+            <VersionTimeline
+              entries={history}
+              viewingIdx={viewingIdx}
+              onSelect={handleViewVersion}
+              onRestore={handleRestoreVersion}
+              onBack={handleBackToCurrent}
             />
-            <CharCount value={draft.headline} max={80} />
-          </Field>
-
-          <Field label="BODY">
-            <textarea
-              value={draft.body}
-              onChange={(e) => update("body", e.target.value)}
-              rows={4}
-              className="bg-border border border-[#2a2a2a] rounded-[5px] px-3 py-2.5 text-brand-white text-sm leading-normal resize-y outline-none"
-            />
-            <CharCount value={draft.body} max={240} />
-          </Field>
-
-          <Field label="SOURCE TAG">
-            <input
-              type="text"
-              value={draft.sourceTag}
-              onChange={(e) => update("sourceTag", e.target.value)}
-              className="bg-border border border-[#2a2a2a] rounded-[5px] px-3 py-2.5 text-brand-white text-sm outline-none w-full"
-            />
-          </Field>
-
-          <div className="flex gap-4">
-            <Field label="DIVISION" className="flex-1">
-              <select
-                value={draft.division}
-                onChange={(e) => update("division", e.target.value)}
-                className="bg-border border border-[#2a2a2a] rounded-[5px] px-3 py-2.5 text-brand-white text-sm outline-none w-full"
-              >
-                {DIVISIONS.map((d) => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="CORNER ACCENT" className="flex-1">
-              <select
-                value={draft.cornerAccent}
-                onChange={(e) => update("cornerAccent", e.target.value as ">" | "+")}
-                className="bg-border border border-[#2a2a2a] rounded-[5px] px-3 py-2.5 text-brand-white text-sm outline-none w-full"
-              >
-                <option value=">">› Chevron</option>
-                <option value="+">+ Plus</option>
-              </select>
-            </Field>
-          </div>
-
-          {error && (
-            <p className="text-accent-analysis text-[0.8rem] m-0">{error}</p>
           )}
+
+          {pending && (
+            <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-lg border border-border-mid bg-border">
+              <p className="text-[0.7rem] text-brand-white opacity-70 m-0">
+                Sofia changed{" "}
+                {pending.changedFields.map((f) => FIELD_LABELS[f] ?? f).join(", ")}
+              </p>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  onClick={handleAccept}
+                  className="text-[0.65rem] font-semibold text-success bg-transparent border border-success/30 rounded px-2.5 py-1 cursor-pointer hover:bg-success/10"
+                >
+                  ACCEPT
+                </button>
+                <button
+                  onClick={handleRevert}
+                  className="text-[0.65rem] font-semibold text-muted bg-transparent border border-border-mid rounded px-2.5 py-1 cursor-pointer hover:text-brand-white"
+                >
+                  REVERT
+                </button>
+              </div>
+            </div>
+          )}
+
+          <StoryFields draft={draft} onUpdate={update} disabled={isViewingHistory} />
+
+          {error && <p className="text-accent-analysis text-[0.8rem] m-0">{error}</p>}
 
           <div className="flex gap-2.5 mt-auto pt-2">
             <button
               onClick={onClose}
               className="flex-1 py-2.5 rounded-[5px] border border-border-mid bg-transparent text-brand-white text-xs font-semibold tracking-[0.06em] cursor-pointer"
             >
-              CANCEL
+              CLOSE
             </button>
             <button
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || !hasDirtyManualEdits}
               className={`flex-[2] py-2.5 rounded-[5px] border-none text-xs font-semibold tracking-[0.06em] ${
-                saving
+                saving || !hasDirtyManualEdits
                   ? "bg-border-mid text-muted cursor-not-allowed"
                   : "bg-brand-white text-brand-black cursor-pointer"
               }`}
@@ -150,27 +336,23 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
             </button>
           </div>
         </div>
+
+        {/* Chat panel */}
+        {sessionId && (
+          <div
+            className={`w-[340px] border-l border-border-light flex flex-col max-md:w-full max-md:flex-1 max-md:border-l-0 max-md:border-t max-md:border-border-light ${tab === "fields" ? "max-md:hidden" : ""}`}
+          >
+            <StoryChat
+              story={draft}
+              date={date}
+              sessionId={sessionId}
+              onUpdate={handleChatUpdate}
+              onReset={handleReset}
+              disabled={isViewingHistory}
+            />
+          </div>
+        )}
       </div>
     </div>
-  );
-}
-
-function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
-  return (
-    <div className={`flex flex-col gap-1.5 ${className ?? ""}`}>
-      <label className="text-[0.65rem] font-semibold text-muted tracking-[0.08em]">
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}
-
-function CharCount({ value, max }: { value: string; max: number }) {
-  const over = value.length > max;
-  return (
-    <span className={`text-[0.65rem] text-right ${over ? "text-accent-analysis" : "text-[#555]"}`}>
-      {value.length}/{max}
-    </span>
   );
 }

@@ -28,3 +28,9 @@ export const ACCENT_COLORS: Record<string, string> = {
   Projects: "#fe43a7",
   Culture:  "#fe43a7",
 };
+
+export interface HistoryEntry {
+  story: Story;
+  label: string;
+  timestamp: string;
+}

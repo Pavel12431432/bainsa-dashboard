@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Story, ApprovalState } from "@/types";
+import { apiFetch } from "@/lib/fetch";
 import { checkCompliance } from "@/lib/compliance";
 import StoryCard from "./StoryCard";
 import ComplianceBadge from "./ComplianceBadge";
@@ -37,11 +38,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals }: Pr
   }, []);
 
   async function handleApprove(index: number, action: "approve" | "reject" | "clear") {
-    const res = await fetch(`/api/stories/${date}/${index}/approve`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Requested-With": "fetch" },
-      body: JSON.stringify({ action }),
-    });
+    const res = await apiFetch(`/api/stories/${date}/${index}/approve`, { action });
     if (res.ok) {
       const data = await res.json();
       setApprovals(data.approvals);

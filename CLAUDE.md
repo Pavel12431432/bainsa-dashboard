@@ -44,6 +44,7 @@ GitHub: `Pavel12431432/bainsa-dashboard` (private). `git pull && npm run build &
 | `STORIES_PATH` | Sofia's story markdown files dir |
 | `MARCO_HANDOFFS_PATH` | Marco's handoff markdown files dir |
 | `APPROVALS_PATH` | Approval JSON sidecar files dir (same as STORIES_PATH) |
+| `OPENCLAW_PASSWORD` | OpenClaw gateway password for Sofia chat API |
 
 ## Data flow
 
@@ -124,6 +125,7 @@ const ACCENT_COLORS = { Analysis: "#fe6203", Projects: "#fe43a7", Culture: "#fe4
 | `api/stories/[date]/route.ts` | 25 | `GET` — returns `{ stories, approvals }` JSON for a date |
 | `api/stories/[date]/[index]/update/route.ts` | 41 | `POST` — updates a story in the markdown file. Requires `X-Requested-With: fetch` header. |
 | `api/stories/[date]/[index]/approve/route.ts` | 24 | `POST` — sets approval state (approve/reject/clear). Returns updated approvals. |
+| `api/stories/[date]/[index]/chat/route.ts` | 38 | `POST` — proxies chat to OpenClaw Sofia agent. Requires `X-Requested-With: fetch`. Body: `{ message, story, sessionId }`. Returns `{ reply, updates }`. |
 | `api/agent-status/route.ts` | 29 | `GET ?date=` — returns Marco/Sofia run status (ranToday, lastRun, count, content) |
 | `api/auth/logout/route.ts` | 10 | `GET` — deletes auth cookie, redirects to `/login` |
 
@@ -134,7 +136,8 @@ const ACCENT_COLORS = { Analysis: "#fe6203", Projects: "#fe43a7", Culture: "#fe4
 | `StoryGrid.tsx` | 139 | Client component. 4-col grid (responsive). Dynamic card scaling. Approve/reject/edit buttons. Empty state. |
 | `StoryCard.tsx` | 34 | Outer card shell: sized container with CSS transform scale. Wraps StoryContent. |
 | `StoryContent.tsx` | 66 | Inner 9:16 story design: accent border, BAINSA logo, chevron/plus SVG, headline, body, source tag. |
-| `StoryEditor.tsx` | 176 | Full-screen edit modal. Left: live preview (hidden on mobile). Right: form fields. Saves via POST. |
+| `StoryEditor.tsx` | 215 | Edit modal. Desktop: preview (left) + form (center) + chat (right). Mobile: FIELDS/SOFIA tabs. Session ID in localStorage. |
+| `StoryChat.tsx` | 120 | Chat panel for inline Sofia editing. Persistent sessions via OpenClaw. Send instructions, get story field updates. |
 | `AgentDrawer.tsx` | 148 | Slide-out drawer showing Marco/Sofia output. Fetches from `/api/agent-status`. Basic markdown renderer. |
 | `DateNav.tsx` | 44 | Date navigation arrows + "TODAY" button. Uses `router.push()`. |
 | `ComplianceBadge.tsx` | 30 | Shows failing compliance checks as small chips (only shows failures). |
@@ -152,6 +155,7 @@ const ACCENT_COLORS = { Analysis: "#fe6203", Projects: "#fe43a7", Culture: "#fe4
 | `fs.ts` | 10 | `fileExists()` utility — async `access()` check, shared across all routes. |
 | `env.ts` | 5 | `requireEnv(name)` — throws if env var missing, used everywhere instead of `?? ""` fallback. |
 | `date.ts` | 9 | `todayRome()` — Europe/Rome date string. `isValidDate(date)` — YYYY-MM-DD regex guard against path traversal. |
+| `openclaw.ts` | 70 | OpenClaw client: `chatWithSofia()`, `buildUserMessage()`, `parseResponse()`. System prompt, JSON extraction from responses. |
 
 ### Config
 
@@ -187,6 +191,15 @@ Defined in `globals.css` as CSS vars + Tailwind `@theme inline`:
 ## API security
 
 All mutation endpoints (`update`, `approve`) require `X-Requested-With: fetch` header to prevent CSRF from form submissions.
+
+## Sofia inline chat
+
+The story editor has an integrated chat panel where you can ask Sofia to refine stories via natural language. Architecture:
+
+- **Session persistence**: OpenClaw sessions keyed by `dashboard:edit:{date}:{index}:{uuid}`. UUID stored in localStorage (`sofia-session:{date}:{index}`). Reset button generates new UUID.
+- **API flow**: Client -> `POST /api/stories/[date]/[index]/chat` -> OpenClaw gateway (`localhost:18789/v1/chat/completions`) with `model: openclaw/story-generator` and `x-openclaw-session-key` header.
+- **Response parsing**: Sofia responds with explanation + optional JSON code block. `parseResponse()` extracts the JSON and applies field updates to the draft.
+- **Layout**: Desktop = preview | form | chat (3 columns). Mobile = FIELDS/SOFIA tab switcher.
 
 ## What's NOT built yet
 
