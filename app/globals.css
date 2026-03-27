@@ -70,6 +70,15 @@ body {
   padding: var(--card-pad);
 }
 
+/* ── Auto-scaling story card (grid, no CLS) ─────────────────── */
+.story-card-auto {
+  container-type: inline-size;
+}
+
+.story-card-auto-inner {
+  transform: scale(tan(atan2(100cqw, 405px)));
+}
+
 /* ── Login button (activates when password field has content) ── */
 .login-btn {
   background: var(--color-border-mid);
