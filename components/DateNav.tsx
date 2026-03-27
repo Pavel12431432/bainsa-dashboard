@@ -30,14 +30,12 @@ export default function DateNav({ date, className }: Props) {
       <Link href={`/stories/${stepDate(date, 1)}`} className={arrow}>
         →
       </Link>
-      {!isToday && (
-        <Link
-          href={`/stories/${today}`}
-          className="bg-transparent border-none text-brand-white opacity-35 text-[0.65rem] font-semibold tracking-[0.04em] cursor-pointer px-2 py-1"
-        >
-          TODAY
-        </Link>
-      )}
+      <Link
+        href={`/stories/${today}`}
+        className={`bg-transparent border-none text-brand-white text-[0.65rem] font-semibold tracking-[0.04em] px-2 py-1 ${isToday ? "opacity-0 pointer-events-none" : "opacity-35 cursor-pointer"}`}
+      >
+        TODAY
+      </Link>
     </div>
   );
 }
