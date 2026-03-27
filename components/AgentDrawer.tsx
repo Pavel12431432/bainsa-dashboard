@@ -24,8 +24,32 @@ function formatTime(iso: string): string {
   });
 }
 
+function linkSources(lines: string[]): string[] {
+  // Merge **Source:** + **Link:** pairs: make the source name a clickable link, drop the Link line.
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const srcMatch = lines[i].match(/^\*\*Source:\*\*\s*(.+)/);
+    if (srcMatch) {
+      // Look ahead for a **Link:** line (possibly after a blank line)
+      const next = lines[i + 1]?.trim() === "" ? lines[i + 2] : lines[i + 1];
+      const linkMatch = next?.match(/^\*\*Link:\*\*\s*(https?:\/\/\S+)/);
+      if (linkMatch) {
+        const url = linkMatch[1];
+        const name = srcMatch[1];
+        out.push(`**Source:** <a href="${url}" target="_blank" rel="noopener noreferrer" class="underline opacity-80 hover:opacity-100">${name}</a>`);
+        // Skip the Link line (and blank line between if present)
+        i += lines[i + 1]?.trim() === "" ? 2 : 1;
+        continue;
+      }
+    }
+    out.push(lines[i]);
+  }
+  return out;
+}
+
 function renderMarkdown(text: string) {
-  return text.split("\n").map((line, i) => {
+  const lines = linkSources(text.split("\n"));
+  return lines.map((line, i) => {
     if (line.startsWith("# "))
       return <p key={i} className="text-[0.8rem] font-bold text-brand-white mt-4 mb-1.5">{line.slice(2)}</p>;
     if (line.startsWith("## "))
@@ -36,7 +60,9 @@ function renderMarkdown(text: string) {
       return <hr key={i} className="border-none border-t border-[#1f1f1f] my-2.5" />;
     if (line.trim() === "")
       return <div key={i} className="h-1.5" />;
-    const boldLine = line.replace(/\*\*(.+?)\*\*/g, (_, m) => `<strong>${m}</strong>`);
+    const boldLine = line
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, (_, text, url) => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="underline opacity-80 hover:opacity-100">${text}</a>`)
+      .replace(/\*\*(.+?)\*\*/g, (_, m) => `<strong>${m}</strong>`);
     return (
       <p
         key={i}
