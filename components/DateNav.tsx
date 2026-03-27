@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 interface Props {
   date: string;
@@ -14,7 +14,6 @@ function stepDate(date: string, days: number): string {
 }
 
 export default function DateNav({ date, className }: Props) {
-  const router = useRouter();
   const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Rome" }).format(new Date());
   const isToday = date === today;
 
@@ -22,22 +21,22 @@ export default function DateNav({ date, className }: Props) {
 
   return (
     <div className={`flex items-center gap-1 ${className ?? ""}`}>
-      <button className={arrow} onClick={() => router.push(`/stories/${stepDate(date, -1)}`)}>
+      <Link href={`/stories/${stepDate(date, -1)}`} className={arrow}>
         ←
-      </button>
+      </Link>
       <span className="text-sm text-brand-white opacity-40 min-w-[90px] text-center">
         {date}
       </span>
-      <button className={arrow} onClick={() => router.push(`/stories/${stepDate(date, 1)}`)}>
+      <Link href={`/stories/${stepDate(date, 1)}`} className={arrow}>
         →
-      </button>
+      </Link>
       {!isToday && (
-        <button
-          onClick={() => router.push(`/stories/${today}`)}
+        <Link
+          href={`/stories/${today}`}
           className="bg-transparent border-none text-brand-white opacity-35 text-[0.65rem] font-semibold tracking-[0.04em] cursor-pointer px-2 py-1"
         >
           TODAY
-        </button>
+        </Link>
       )}
     </div>
   );
