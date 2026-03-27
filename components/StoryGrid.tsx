@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Story, ApprovalState } from "@/types";
 import { apiFetch } from "@/lib/fetch";
 import { checkCompliance } from "@/lib/compliance";
@@ -20,22 +20,6 @@ export default function StoryGrid({ date, initialStories, initialApprovals }: Pr
   const [stories, setStories] = useState<Story[]>(initialStories);
   const [approvals, setApprovals] = useState<ApprovalState>(initialApprovals);
   const [editing, setEditing] = useState<Story | null>(null);
-  const [cardScale, setCardScale] = useState(0.72);
-
-  useEffect(() => {
-    const update = () => {
-      const w = window.innerWidth;
-      if (w < 640) {
-        setCardScale(0.8);
-      } else {
-        const colWidth = (w - 40 - 3 * 32) / 4;
-        setCardScale(Math.min(colWidth / 405, 1));
-      }
-    };
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
 
   async function handleApprove(index: number, action: "approve" | "reject" | "clear") {
     const res = await apiFetch(`/api/stories/${date}/${index}/approve`, { action });
@@ -77,8 +61,8 @@ export default function StoryGrid({ date, initialStories, initialApprovals }: Pr
           return (
             <div key={story.index} className="flex flex-col gap-3">
               {/* Card */}
-              <div className="relative inline-block self-center">
-                <StoryCard story={story} scale={cardScale} />
+              <div className="relative w-full">
+                <StoryCard story={story} />
 
                 {approved && (
                   <div className="absolute inset-0 rounded-2xl border-2 border-success pointer-events-none" />
