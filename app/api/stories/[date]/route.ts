@@ -3,14 +3,18 @@ import { readFile } from "fs/promises";
 import { parseStories } from "@/lib/parseStories";
 import { readApprovals } from "@/lib/approvals";
 import { fileExists } from "@/lib/fs";
+import { isValidDate } from "@/lib/date";
+import { requireEnv } from "@/lib/env";
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ date: string }> }
 ) {
   const { date } = await params;
-  const storiesPath = process.env.STORIES_PATH ?? "";
-  const filePath = `${storiesPath}/${date}.md`;
+  if (!isValidDate(date)) {
+    return NextResponse.json({ error: "Invalid date" }, { status: 400 });
+  }
+  const filePath = `${requireEnv("STORIES_PATH")}/${date}.md`;
 
   if (!(await fileExists(filePath))) {
     return NextResponse.json({ stories: [], approvals: { approved: [], rejected: [] } });

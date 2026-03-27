@@ -1,14 +1,14 @@
 import { readFile, writeFile } from "fs/promises";
 import { ApprovalState } from "@/types";
 import { fileExists } from "@/lib/fs";
+import { requireEnv } from "@/lib/env";
 
-function approvalPath(storiesPath: string, date: string): string {
-  return `${storiesPath}/${date}.approved.json`;
+function approvalPath(date: string): string {
+  return `${requireEnv("APPROVALS_PATH")}/${date}.approved.json`;
 }
 
 export async function readApprovals(date: string): Promise<ApprovalState> {
-  const storiesPath = process.env.APPROVALS_PATH ?? "";
-  const path = approvalPath(storiesPath, date);
+  const path = approvalPath(date);
   if (!(await fileExists(path))) return { approved: [], rejected: [] };
   try {
     return JSON.parse(await readFile(path, "utf-8"));
@@ -18,8 +18,7 @@ export async function readApprovals(date: string): Promise<ApprovalState> {
 }
 
 export async function writeApprovals(date: string, state: ApprovalState): Promise<void> {
-  const storiesPath = process.env.APPROVALS_PATH ?? "";
-  const path = approvalPath(storiesPath, date);
+  const path = approvalPath(date);
   await writeFile(path, JSON.stringify(state, null, 2), "utf-8");
 }
 

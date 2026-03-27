@@ -15,7 +15,7 @@ function stepDate(date: string, days: number): string {
 
 export default function DateNav({ date, className }: Props) {
   const router = useRouter();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Rome" }).format(new Date());
   const isToday = date === today;
 
   const arrow = "bg-transparent border-none text-brand-white opacity-50 text-base cursor-pointer px-2 py-1 leading-none";

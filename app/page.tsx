@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
+import { todayRome } from "@/lib/date";
 
 export const dynamic = "force-dynamic";
 
 export default function Home() {
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-  redirect(`/stories/${today}`);
+  redirect(`/stories/${todayRome()}`);
 }

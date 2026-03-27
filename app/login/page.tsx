@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createToken, COOKIE_NAME, MAX_AGE } from "@/lib/auth";
+import { todayRome } from "@/lib/date";
 
 async function login(formData: FormData) {
   "use server";
@@ -22,8 +23,7 @@ async function login(formData: FormData) {
     path: "/",
   });
 
-  const today = new Date().toISOString().slice(0, 10);
-  redirect(`/stories/${today}`);
+  redirect(`/stories/${todayRome()}`);
 }
 
 export default async function LoginPage({
@@ -51,8 +51,7 @@ export default async function LoginPage({
           placeholder="Password"
           autoFocus
           disabled={locked}
-          className="bg-border text-brand-white border border-border-mid rounded-md px-4 py-3 text-base outline-none"
-          style={locked ? { opacity: 0.4 } : undefined}
+          className="bg-border text-brand-white border border-border-mid rounded-md px-4 py-3 text-base outline-none disabled:opacity-40"
         />
 
         {params.error === "1" && (

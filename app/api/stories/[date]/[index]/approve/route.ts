@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { setApproval } from "@/lib/approvals";
+import { isValidDate } from "@/lib/date";
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const INDEX_RE = /^\d+$/;
 
 export async function POST(
@@ -14,7 +14,7 @@ export async function POST(
 
   const { date, index } = await params;
 
-  if (!DATE_RE.test(date) || !INDEX_RE.test(index)) {
+  if (!isValidDate(date) || !INDEX_RE.test(index)) {
     return NextResponse.json({ error: "Invalid params" }, { status: 400 });
   }
 

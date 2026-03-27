@@ -3,8 +3,9 @@ import { readFile, writeFile } from "fs/promises";
 import { replaceStory } from "@/lib/serializeStories";
 import { fileExists } from "@/lib/fs";
 import { Story } from "@/types";
+import { requireEnv } from "@/lib/env";
+import { isValidDate } from "@/lib/date";
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const INDEX_RE = /^\d+$/;
 
 export async function POST(
@@ -17,12 +18,11 @@ export async function POST(
 
   const { date, index } = await params;
 
-  if (!DATE_RE.test(date) || !INDEX_RE.test(index)) {
+  if (!isValidDate(date) || !INDEX_RE.test(index)) {
     return NextResponse.json({ error: "Invalid params" }, { status: 400 });
   }
 
-  const storiesPath = process.env.STORIES_PATH ?? "";
-  const filePath = `${storiesPath}/${date}.md`;
+  const filePath = `${requireEnv("STORIES_PATH")}/${date}.md`;
 
   if (!(await fileExists(filePath))) {
     return NextResponse.json({ error: "File not found" }, { status: 404 });

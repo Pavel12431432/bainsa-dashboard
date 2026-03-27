@@ -1,7 +1,10 @@
 import { readFile } from "fs/promises";
+import { notFound } from "next/navigation";
 import { parseStories } from "@/lib/parseStories";
 import { readApprovals } from "@/lib/approvals";
 import { fileExists } from "@/lib/fs";
+import { isValidDate } from "@/lib/date";
+import { requireEnv } from "@/lib/env";
 import StoryGrid from "@/components/StoryGrid";
 import DateNav from "@/components/DateNav";
 import AgentDrawer from "@/components/AgentDrawer";
@@ -12,8 +15,8 @@ interface Props {
 
 export default async function StoriesPage({ params }: Props) {
   const { date } = await params;
-  const storiesPath = process.env.STORIES_PATH ?? "";
-  const filePath = `${storiesPath}/${date}.md`;
+  if (!isValidDate(date)) notFound();
+  const filePath = `${requireEnv("STORIES_PATH")}/${date}.md`;
 
   const exists = await fileExists(filePath);
   const [stories, approvals] = await Promise.all([
