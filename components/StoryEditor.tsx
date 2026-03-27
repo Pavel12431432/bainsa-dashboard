@@ -290,24 +290,41 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
           )}
 
           {pending && (
-            <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-lg border border-border-mid bg-border">
-              <p className="text-[0.7rem] text-brand-white opacity-70 m-0">
-                Sofia changed{" "}
-                {pending.changedFields.map((f) => FIELD_LABELS[f] ?? f).join(", ")}
-              </p>
-              <div className="flex gap-2 shrink-0">
-                <button
-                  onClick={handleAccept}
-                  className="text-[0.65rem] font-semibold text-success bg-transparent border border-success/30 rounded px-2.5 py-1 cursor-pointer hover:bg-success/10"
-                >
-                  ACCEPT
-                </button>
-                <button
-                  onClick={handleRevert}
-                  className="text-[0.65rem] font-semibold text-muted bg-transparent border border-border-mid rounded px-2.5 py-1 cursor-pointer hover:text-brand-white"
-                >
-                  REVERT
-                </button>
+            <div className="flex flex-col gap-2 px-3.5 py-2.5 rounded-lg border border-border-mid bg-border">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[0.7rem] text-brand-white opacity-70 m-0">
+                  Sofia changed{" "}
+                  {pending.changedFields.map((f) => FIELD_LABELS[f] ?? f).join(", ")}
+                </p>
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={handleAccept}
+                    className="text-[0.65rem] font-semibold text-success bg-transparent border border-success/30 rounded px-2.5 py-1 cursor-pointer hover:bg-success/10"
+                  >
+                    ACCEPT
+                  </button>
+                  <button
+                    onClick={handleRevert}
+                    className="text-[0.65rem] font-semibold text-muted bg-transparent border border-border-mid rounded px-2.5 py-1 cursor-pointer hover:text-brand-white"
+                  >
+                    REVERT
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                {pending.changedFields.map((f) => {
+                  const key = f === "source" ? "sourceTag" : f === "accent" ? "cornerAccent" : f;
+                  const old = (pending.before as unknown as Record<string, string>)[key] ?? "";
+                  const now = (pending.after as unknown as Record<string, string>)[key] ?? "";
+                  return (
+                    <div key={f} className="text-[0.65rem] leading-relaxed">
+                      <span className="text-muted font-semibold uppercase tracking-[0.04em]">{FIELD_LABELS[f] ?? f}: </span>
+                      <span className="text-danger/70 line-through">{old}</span>
+                      <span className="text-muted mx-1">→</span>
+                      <span className="text-success/90">{now}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
