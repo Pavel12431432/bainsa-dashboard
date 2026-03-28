@@ -72,15 +72,17 @@ export default function StoryGrid({ date, initialStories, initialApprovals }: Pr
                     <span className="text-danger text-2xl font-bold">✕</span>
                   </div>
                 )}
+                {!compliance.pass && (
+                  <div className="absolute bottom-2 left-2 right-2 pointer-events-none">
+                    <ComplianceBadge result={compliance} />
+                  </div>
+                )}
               </div>
 
-              {/* Title + compliance */}
-              <div className="flex-1 flex flex-col justify-end gap-2">
-                <p className="text-brand-white text-[0.8rem] opacity-50 m-0 leading-tight">
-                  {story.index}. {story.title}
-                </p>
-                <ComplianceBadge result={compliance} />
-              </div>
+              {/* Title */}
+              <p className="text-brand-white text-[0.8rem] opacity-50 m-0 leading-tight">
+                {story.index}. {story.title}
+              </p>
 
               {/* Action buttons */}
               <div className="flex gap-2">

@@ -16,13 +16,13 @@ export default function ComplianceBadge({ result }: Props) {
   if (failures.length === 0) return null;
 
   return (
-    <div className="flex gap-[5px] flex-wrap">
+    <div className="flex gap-1 flex-wrap justify-end">
       {failures.map(({ key, label }) => (
         <span
           key={key}
-          className="text-[0.62rem] font-semibold tracking-[0.03em] px-1.5 py-0.5 rounded-sm bg-transparent text-muted border border-border-mid"
+          className="text-[0.55rem] font-semibold tracking-[0.03em] px-1.5 py-0.5 rounded-sm bg-black/70 text-danger backdrop-blur-sm"
         >
-          ✕ {label}
+          ✕ {label.toUpperCase()}
         </span>
       ))}
     </div>
