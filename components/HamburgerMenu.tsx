@@ -13,7 +13,7 @@ interface Props {
 export default function HamburgerMenu({ open, onClose, onOpenAgentOutput }: Props) {
   return (
     <SlidePanel side="left" open={open} title="MENU" onClose={onClose}>
-      <div className="py-3">
+      <div className="py-3 overflow-y-auto h-full">
         {/* Agent outputs section */}
         <p className="px-6 py-2 text-[0.65rem] font-semibold text-brand-white opacity-25 tracking-[0.08em] uppercase">
           Agent Outputs

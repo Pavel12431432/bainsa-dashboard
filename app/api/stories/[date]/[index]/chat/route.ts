@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isValidDate } from "@/lib/date";
-import { chatWithSofia, buildUserMessage, parseResponse } from "@/lib/openclaw";
+import { chatWithAgent, buildUserMessage, parseResponse } from "@/lib/openclaw";
 import { Story } from "@/types";
 
 export async function POST(
@@ -30,7 +30,7 @@ export async function POST(
   const userMessage = buildUserMessage(story, message);
 
   try {
-    const content = await chatWithSofia(userMessage, fullSessionId);
+    const content = await chatWithAgent("sofia", fullSessionId, userMessage);
     const { message: reply, updates } = parseResponse(content);
     return NextResponse.json({ reply, updates });
   } catch (err) {

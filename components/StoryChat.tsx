@@ -55,11 +55,19 @@ export default function StoryChat({ story, date, sessionId, onUpdate, onReset, d
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  function autoResize() {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 120) + "px";
+  }
+
   async function send() {
     const text = input.trim();
     if (!text || loading) return;
 
     setInput("");
+    if (inputRef.current) inputRef.current.style.height = "auto";
     const withUser = [...messages, { role: "user" as const, content: text }];
     setMessages(withUser);
     persist(withUser);
@@ -155,11 +163,12 @@ export default function StoryChat({ story, date, sessionId, onUpdate, onReset, d
             <textarea
               ref={inputRef}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => { setInput(e.target.value); autoResize(); }}
               onKeyDown={handleKeyDown}
               placeholder="Ask Sofia..."
               rows={1}
-              className="flex-1 bg-border border border-border-mid rounded-md px-3 py-2 text-xs text-brand-white resize-none outline-none max-h-20"
+              className="flex-1 bg-border border border-border-mid rounded-md px-3 py-2 text-xs text-brand-white resize-none outline-none overflow-y-auto"
+              style={{ maxHeight: 120 }}
             />
             <button
               onClick={send}

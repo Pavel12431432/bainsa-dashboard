@@ -3,18 +3,25 @@
 import { useState } from "react";
 import DateNav from "./DateNav";
 import HamburgerMenu from "./HamburgerMenu";
-import AgentDrawer from "./AgentDrawer";
+import AgentChat from "./AgentChat";
 
 type Agent = "MARCO" | "SOFIA";
 type OpenPanel = null | "menu" | "agent-marco" | "agent-sofia";
 
 export default function HeaderShell({ date }: { date: string }) {
   const [panel, setPanel] = useState<OpenPanel>(null);
+  const [outputExpanded, setOutputExpanded] = useState(false);
 
   const close = () => setPanel(null);
   const activeAgent: Agent | null =
     panel === "agent-marco" ? "MARCO" :
     panel === "agent-sofia" ? "SOFIA" : null;
+
+  function openAgent(a: Agent, expanded: boolean) {
+    setOutputExpanded(expanded);
+    const key = `agent-${a.toLowerCase()}` as OpenPanel;
+    setPanel(panel === key ? null : key);
+  }
 
   return (
     <>
@@ -45,8 +52,8 @@ export default function HeaderShell({ date }: { date: string }) {
           {(["MARCO", "SOFIA"] as Agent[]).map((a) => (
             <button
               key={a}
-              onClick={() => setPanel(panel === `agent-${a.toLowerCase()}` ? null : `agent-${a.toLowerCase()}` as OpenPanel)}
-              className="px-4 py-[7px] rounded-[5px] border border-border-mid bg-transparent text-brand-white opacity-55 text-xs font-semibold tracking-[0.04em] cursor-pointer transition-opacity duration-150 hover:opacity-90 max-sm:px-3"
+              onClick={() => openAgent(a, false)}
+              className="px-4 py-[7px] rounded-[5px] border border-border-mid bg-transparent text-brand-white opacity-55 text-xs font-semibold tracking-[0.04em] cursor-pointer transition-opacity duration-150 hover:opacity-90"
             >
               ▸ {a}
             </button>
@@ -66,12 +73,13 @@ export default function HeaderShell({ date }: { date: string }) {
       <HamburgerMenu
         open={panel === "menu"}
         onClose={close}
-        onOpenAgentOutput={(a) => setPanel(`agent-${a.toLowerCase()}` as OpenPanel)}
+        onOpenAgentOutput={(a) => openAgent(a, true)}
       />
-      <AgentDrawer
+      <AgentChat
         date={date}
         open={!!activeAgent}
         agent={activeAgent}
+        outputExpanded={outputExpanded}
         onClose={close}
       />
     </>

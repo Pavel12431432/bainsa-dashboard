@@ -1,6 +1,9 @@
 import { execFile } from "child_process";
 import { Story } from "@/types";
 
+const AGENT_CLI_NAMES = { marco: "news-researcher", sofia: "story-generator" } as const;
+export type AgentId = keyof typeof AGENT_CLI_NAMES;
+
 export function buildUserMessage(story: Story, instruction: string): string {
   return `You are editing a BAINSA Instagram story card. Constraints: headline max 80 chars, body max 240 chars. Available JSON fields: headline, body, sourceTag, division, cornerAccent.
 
@@ -16,16 +19,17 @@ Corner accent: ${story.cornerAccent}
 User: ${instruction}`;
 }
 
-export function chatWithSofia(
-  message: string,
+export function chatWithAgent(
+  agent: AgentId,
   sessionId: string,
+  message: string,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(
       "docker",
       [
         "exec", "openclaw", "openclaw", "agent",
-        "--agent", "story-generator",
+        "--agent", AGENT_CLI_NAMES[agent],
         "--session-id", sessionId,
         "--message", message,
         "--json",
