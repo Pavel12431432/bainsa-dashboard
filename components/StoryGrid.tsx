@@ -35,9 +35,15 @@ export default function StoryGrid({ date, initialStories, initialApprovals }: Pr
 
   if (stories.length === 0) {
     return (
-      <div className="text-left text-brand-white opacity-40 py-12">
-        No stories for this date — run Sofia to generate.
-      </div>
+      <>
+        <div className="mb-8">
+          <h1 className="text-xl font-semibold text-brand-white m-0">Stories</h1>
+          <p className="text-[0.8rem] text-brand-white opacity-35 mt-1">0 stories</p>
+        </div>
+        <div className="text-left text-brand-white opacity-40 py-12">
+          No stories for this date — run Sofia to generate.
+        </div>
+      </>
     );
   }
 
@@ -51,6 +57,14 @@ export default function StoryGrid({ date, initialStories, initialApprovals }: Pr
           onSaved={handleSaved}
         />
       )}
+
+      <div className="mb-8">
+        <h1 className="text-xl font-semibold text-brand-white m-0">Stories</h1>
+        <p className="text-[0.8rem] text-brand-white opacity-35 mt-1">
+          {stories.length} {stories.length === 1 ? "story" : "stories"} ·{" "}
+          {approvals.approved.length} approved · {approvals.rejected.length} rejected
+        </p>
+      </div>
 
       <div className="grid gap-8 grid-cols-4 max-lg:grid-cols-[repeat(auto-fill,minmax(min(280px,100%),1fr))]">
         {stories.map((story) => {

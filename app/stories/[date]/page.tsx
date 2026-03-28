@@ -47,14 +47,6 @@ export default async function StoriesPage({ params }: Props) {
 
       {/* Content */}
       <main className="p-5">
-        <div className="mb-8">
-          <h1 className="text-xl font-semibold text-brand-white m-0">Stories</h1>
-          <p className="text-[0.8rem] text-brand-white opacity-35 mt-1">
-            {stories.length} {stories.length === 1 ? "story" : "stories"} ·{" "}
-            {approvals.approved.length} approved · {approvals.rejected.length} rejected
-          </p>
-        </div>
-
         <StoryGrid date={date} initialStories={stories} initialApprovals={approvals} />
       </main>
     </div>
