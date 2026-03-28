@@ -7,6 +7,7 @@ import { checkCompliance } from "@/lib/compliance";
 import StoryCard from "./StoryCard";
 import ComplianceBadge from "./ComplianceBadge";
 import StoryEditor from "./StoryEditor";
+import ExportDialog from "./ExportDialog";
 
 interface Props {
   date: string;
@@ -35,6 +36,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
   }, [highlightIndex]);
   const [approvals, setApprovals] = useState<ApprovalState>(initialApprovals);
   const [editing, setEditing] = useState<Story | null>(null);
+  const [showExport, setShowExport] = useState(false);
 
   async function handleApprove(index: number, action: "approve" | "reject" | "clear") {
     const res = await apiFetch(`/api/stories/${date}/${index}/approve`, { action });
@@ -61,6 +63,8 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
       </>
     );
   }
+
+  const approvedStories = stories.filter((s) => approvals.approved.includes(s.index));
 
   return (
     <>
@@ -146,6 +150,25 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
           );
         })}
       </div>
+
+      {approvedStories.length > 0 && (
+        <div className="mt-10 flex justify-center">
+          <button
+            onClick={() => setShowExport(true)}
+            className="px-6 py-3 rounded-lg border border-border-mid bg-transparent text-brand-white text-xs font-semibold tracking-[0.06em] cursor-pointer hover:bg-border transition-colors duration-150"
+          >
+            EXPORT APPROVED ({approvedStories.length})
+          </button>
+        </div>
+      )}
+
+      {showExport && (
+        <ExportDialog
+          stories={approvedStories}
+          date={date}
+          onClose={() => setShowExport(false)}
+        />
+      )}
     </>
   );
 }
