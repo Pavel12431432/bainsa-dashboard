@@ -131,8 +131,11 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose }
         message: text,
         sessionId,
       });
+      if (!res.ok) {
+        const text = await res.text();
+        try { throw new Error(JSON.parse(text).error); } catch { throw new Error(`Server error (${res.status})`); }
+      }
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Request failed");
 
       const withReply = [...withUser, { role: "assistant" as const, content: data.reply }];
       setMessages(withReply);
