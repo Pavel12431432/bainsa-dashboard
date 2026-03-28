@@ -66,7 +66,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals }: Pr
         </p>
       </div>
 
-      <div className="grid gap-8 grid-cols-4 max-lg:grid-cols-[repeat(auto-fill,minmax(min(280px,100%),1fr))]">
+      <div className="grid gap-8 grid-cols-4 max-lg:grid-cols-[repeat(auto-fill,minmax(min(280px,100%),1fr))] max-sm:grid-cols-1 max-sm:max-w-[405px] max-sm:mx-auto">
         {stories.map((story) => {
           const compliance = checkCompliance(story);
           const approved = approvals.approved.includes(story.index);
