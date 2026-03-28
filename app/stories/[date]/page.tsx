@@ -10,10 +10,12 @@ import HeaderShell from "@/components/HeaderShell";
 
 interface Props {
   params: Promise<{ date: string }>;
+  searchParams: Promise<{ highlight?: string }>;
 }
 
-export default async function StoriesPage({ params }: Props) {
+export default async function StoriesPage({ params, searchParams }: Props) {
   const { date } = await params;
+  const { highlight } = await searchParams;
   if (!isValidDate(date)) notFound();
   const filePath = `${requireEnv("STORIES_PATH")}/${date}.md`;
 
@@ -29,7 +31,7 @@ export default async function StoriesPage({ params }: Props) {
 
       {/* Content */}
       <main className="p-5">
-        <StoryGrid date={date} initialStories={stories} initialApprovals={approvals} />
+        <StoryGrid date={date} initialStories={stories} initialApprovals={approvals} highlightIndex={highlight ? Number(highlight) : undefined} />
       </main>
     </div>
   );

@@ -84,3 +84,14 @@ body {
   cursor: pointer;
   pointer-events: auto;
 }
+
+/* ── Search highlight pulse ─────────────────────────────────── */
+@keyframes highlight-fade {
+  0%   { outline: 2px solid var(--accent-analysis); outline-offset: 4px; }
+  100% { outline: 2px solid transparent; outline-offset: 4px; }
+}
+
+.highlight-pulse {
+  animation: highlight-fade 2s ease-out forwards;
+  border-radius: 16px;
+}

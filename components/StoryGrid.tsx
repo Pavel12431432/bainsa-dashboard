@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Story, ApprovalState } from "@/types";
 import { apiFetch } from "@/lib/fetch";
 import { checkCompliance } from "@/lib/compliance";
@@ -12,12 +12,27 @@ interface Props {
   date: string;
   initialStories: Story[];
   initialApprovals: ApprovalState;
+  highlightIndex?: number;
 }
 
 const actionBtn = "flex-1 py-[7px] rounded-[5px] text-xs font-semibold tracking-[0.04em] cursor-pointer";
 
-export default function StoryGrid({ date, initialStories, initialApprovals }: Props) {
+export default function StoryGrid({ date, initialStories, initialApprovals, highlightIndex }: Props) {
   const [stories, setStories] = useState<Story[]>(initialStories);
+  const highlightDone = useRef(false);
+
+  useEffect(() => {
+    if (highlightIndex == null || highlightDone.current) return;
+    highlightDone.current = true;
+    // Small delay to let the page render
+    setTimeout(() => {
+      const el = document.getElementById(`story-${highlightIndex}`);
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("highlight-pulse");
+      setTimeout(() => el.classList.remove("highlight-pulse"), 2000);
+    }, 300);
+  }, [highlightIndex]);
   const [approvals, setApprovals] = useState<ApprovalState>(initialApprovals);
   const [editing, setEditing] = useState<Story | null>(null);
 
@@ -73,7 +88,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals }: Pr
           const rejected = approvals.rejected.includes(story.index);
 
           return (
-            <div key={story.index} className="flex flex-col gap-3">
+            <div key={story.index} id={`story-${story.index}`} className="flex flex-col gap-3">
               {/* Card */}
               <div className="relative w-full">
                 <StoryCard story={story} />
