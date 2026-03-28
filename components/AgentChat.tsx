@@ -51,6 +51,7 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose }
   const [status, setStatus] = useState<Status | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
   const [expanded, setExpanded] = useState(outputExpanded);
+  const [outputHeight, setOutputHeight] = useState(200);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -58,6 +59,9 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose }
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const loaded = useRef(false);
+  const dragging = useRef(false);
+  const dragStartY = useRef(0);
+  const dragStartHeight = useRef(0);
 
   // Sync expanded state when panel opens
   useEffect(() => {
@@ -163,6 +167,33 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose }
     setMessages([]);
   }
 
+  function onDragStart(e: React.MouseEvent | React.TouchEvent) {
+    e.preventDefault();
+    dragging.current = true;
+    dragStartHeight.current = outputHeight;
+    dragStartY.current = "touches" in e ? e.touches[0].clientY : e.clientY;
+
+    function onMove(ev: MouseEvent | TouchEvent) {
+      if (!dragging.current) return;
+      const clientY = "touches" in ev ? ev.touches[0].clientY : (ev as MouseEvent).clientY;
+      const delta = clientY - dragStartY.current;
+      setOutputHeight(Math.max(80, Math.min(dragStartHeight.current + delta, window.innerHeight - 200)));
+    }
+
+    function onEnd() {
+      dragging.current = false;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onEnd);
+      document.removeEventListener("touchmove", onMove);
+      document.removeEventListener("touchend", onEnd);
+    }
+
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onEnd);
+    document.addEventListener("touchmove", onMove);
+    document.addEventListener("touchend", onEnd);
+  }
+
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -181,12 +212,12 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose }
       onClose={onClose}
     >
       <div className="flex flex-col h-full min-h-0">
-        {/* Collapsible output block */}
+        {/* Collapsible + resizable output block */}
         {current && current.ranToday && current.content && (
-          <div className="shrink-0 border-b border-[#1f1f1f]">
+          <div className="shrink-0">
             <button
               onClick={() => setExpanded(!expanded)}
-              className="w-full flex items-center justify-between px-6 py-3 bg-[#141414] text-left border-none cursor-pointer"
+              className="w-full flex items-center justify-between px-6 py-3 bg-[#141414] text-left border-none cursor-pointer border-b border-[#1f1f1f]"
             >
               <span className="text-[0.7rem] font-semibold text-brand-white opacity-55">
                 Output · {current.count} {label}
@@ -196,9 +227,22 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose }
               </span>
             </button>
             {expanded && (
-              <div className="max-h-[50vh] overflow-y-auto px-6 py-4 bg-[#141414]">
-                {renderMarkdown(current.content)}
-              </div>
+              <>
+                <div
+                  className="overflow-y-auto px-6 py-4 bg-[#141414]"
+                  style={{ height: outputHeight }}
+                >
+                  {renderMarkdown(current.content)}
+                </div>
+                {/* Drag handle */}
+                <div
+                  onMouseDown={onDragStart}
+                  onTouchStart={onDragStart}
+                  className="h-2 bg-[#141414] border-b border-[#1f1f1f] cursor-row-resize flex items-center justify-center shrink-0"
+                >
+                  <div className="w-8 h-[3px] rounded-full bg-border-mid" />
+                </div>
+              </>
             )}
           </div>
         )}
