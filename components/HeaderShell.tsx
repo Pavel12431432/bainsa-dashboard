@@ -25,7 +25,7 @@ export default function HeaderShell({ date }: { date: string }) {
 
   return (
     <>
-      <header className="flex items-center gap-3 px-5 py-4 border-b border-border sticky top-0 bg-brand-black z-10 max-sm:gap-2 max-sm:px-4 max-sm:py-3">
+      <header className="relative flex items-center gap-3 px-5 py-4 border-b border-border sticky top-0 bg-brand-black z-10 max-sm:gap-2 max-sm:px-4 max-sm:py-3">
         {/* Hamburger */}
         <button
           onClick={() => setPanel(panel === "menu" ? null : "menu")}
@@ -41,11 +41,13 @@ export default function HeaderShell({ date }: { date: string }) {
           BAINSA
         </span>
 
-        {/* Spacer */}
-        <div className="flex-1" />
+        {/* Date nav — centered overlay on desktop, inline on mobile */}
+        <div className="absolute inset-x-0 flex justify-center pointer-events-none max-sm:contents">
+          <DateNav date={date} className="pointer-events-auto max-sm:ml-auto" />
+        </div>
 
-        {/* Date nav */}
-        <DateNav date={date} />
+        {/* Spacer (pushes agent buttons right on desktop) */}
+        <div className="flex-1 max-sm:hidden" />
 
         {/* Agent buttons */}
         <div className="flex gap-2.5 max-sm:hidden">
