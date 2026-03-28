@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import SlidePanel from "./SlidePanel";
 
 type Agent = "MARCO" | "SOFIA";
 
@@ -93,41 +94,28 @@ export default function AgentDrawer({ date, open, agent, onClose }: Props) {
   const current = agent === "MARCO" ? status?.marco : status?.sofia;
   const label = agent === "MARCO" ? "articles" : "stories";
 
-  return (
-    <div
-      className="fixed top-0 right-0 bottom-0 w-[min(400px,100vw)] bg-surface border-l border-[#1f1f1f] z-50 flex flex-col transition-transform duration-[220ms] ease-out"
-      style={{ transform: open ? "translateX(0)" : "translateX(100%)" }}
-    >
-      {/* Drawer header */}
-      <div className="flex items-center justify-between px-6 py-5 border-b border-[#1f1f1f] shrink-0">
-        <div className="flex items-center gap-2.5">
-          <span className="text-xs font-semibold text-brand-white tracking-[0.08em]">
-            {agent ?? "AGENT"}
+  const title = (
+    <>
+      {agent ?? "AGENT"}
+      {!loading && current && (
+        <div className="flex items-center gap-1.5">
+          <div
+            className="w-[5px] h-[5px] rounded-full"
+            style={{ background: current.ranToday ? "#22c55e" : "#555" }}
+          />
+          <span className="text-[0.65rem] text-brand-white opacity-35 font-semibold">
+            {current.ranToday
+              ? `${current.count} ${label} · ${formatTime(current.lastRun!)}`
+              : "not run today"}
           </span>
-          {!loading && current && (
-            <div className="flex items-center gap-1.5">
-              <div
-                className="w-[5px] h-[5px] rounded-full"
-                style={{ background: current.ranToday ? "#22c55e" : "#555" }}
-              />
-              <span className="text-[0.65rem] text-brand-white opacity-35">
-                {current.ranToday
-                  ? `${current.count} ${label} · ${formatTime(current.lastRun!)}`
-                  : "not run today"}
-              </span>
-            </div>
-          )}
         </div>
-        <button
-          onClick={onClose}
-          className="bg-transparent border-none text-brand-white opacity-40 cursor-pointer text-base p-1"
-        >
-          ✕
-        </button>
-      </div>
+      )}
+    </>
+  );
 
-      {/* Drawer body */}
-      <div className="flex-1 overflow-y-auto px-6 py-5">
+  return (
+    <SlidePanel side="right" open={open} title={title} onClose={onClose}>
+      <div className="px-6 py-5">
         {loading && (
           <p className="text-xs text-brand-white opacity-25">Loading...</p>
         )}
@@ -142,6 +130,6 @@ export default function AgentDrawer({ date, open, agent, onClose }: Props) {
 
         {!loading && current?.content && renderMarkdown(current.content)}
       </div>
-    </div>
+    </SlidePanel>
   );
 }
