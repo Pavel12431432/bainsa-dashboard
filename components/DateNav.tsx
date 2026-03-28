@@ -28,6 +28,22 @@ export default function DateNav({ date, className }: Props) {
   const [viewYear, setViewYear] = useState(0);
   const [viewMonth, setViewMonth] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
+  const [storyDays, setStoryDays] = useState<Set<number>>(new Set());
+  const cache = useRef<Map<string, Set<number>>>(new Map());
+
+  async function fetchDays(year: number, month: number): Promise<Set<number>> {
+    const key = `${year}-${month}`;
+    if (cache.current.has(key)) return cache.current.get(key)!;
+    try {
+      const r = await fetch(`/api/story-dates?year=${year}&month=${month}`);
+      const d = await r.json();
+      const s = new Set<number>(d.days);
+      cache.current.set(key, s);
+      return s;
+    } catch {
+      return new Set();
+    }
+  }
 
   function toggle() {
     if (!open) {
@@ -38,8 +54,29 @@ export default function DateNav({ date, className }: Props) {
     setOpen(!open);
   }
 
+  // Prefetch current month on mount
+  useEffect(() => {
+    const [y, m] = date.split("-").map(Number);
+    fetchDays(y, m);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Close when date changes (arrow navigation)
   useEffect(() => { setOpen(false); }, [date]);
+
+  // Fetch current month + prefetch adjacent months when calendar is open
+  useEffect(() => {
+    if (!open || !viewYear) return;
+
+    // Current month — update visible days
+    fetchDays(viewYear, viewMonth + 1).then(setStoryDays);
+
+    // Prefetch prev and next month in the background
+    const prev = viewMonth === 0 ? { y: viewYear - 1, m: 12 } : { y: viewYear, m: viewMonth };
+    const next = viewMonth === 11 ? { y: viewYear + 1, m: 1 } : { y: viewYear, m: viewMonth + 2 };
+    fetchDays(prev.y, prev.m);
+    fetchDays(next.y, next.m);
+  }, [open, viewYear, viewMonth]);
 
   // Close on outside click
   useEffect(() => {
@@ -117,6 +154,18 @@ export default function DateNav({ date, className }: Props) {
               const iso = `${viewYear}-${pad(viewMonth + 1)}-${pad(day)}`;
               const isSelected = iso === date;
               const isToday = iso === today;
+              const hasStories = storyDays.has(day) || isToday;
+
+              if (!hasStories) {
+                return (
+                  <span
+                    key={day}
+                    className="text-[0.7rem] text-center py-1.5 rounded text-brand-white opacity-15 select-none"
+                  >
+                    {day}
+                  </span>
+                );
+              }
 
               return (
                 <Link
