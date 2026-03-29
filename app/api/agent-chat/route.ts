@@ -6,7 +6,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { agent, message, sessionId } = await req.json();
+  const { agent, message, sessionId, newSession } = await req.json();
 
   if (!agent || !["marco", "sofia"].includes(agent)) {
     return NextResponse.json({ error: "Invalid agent" }, { status: 400 });
@@ -21,7 +21,8 @@ export async function POST(req: NextRequest) {
   const fullSessionId = `agent-chat-${agent}-${sessionId}`;
 
   try {
-    const reply = await chatWithAgent(agent as AgentId, fullSessionId, message);
+    const finalMessage = newSession ? `/new ${message}` : message;
+    const reply = await chatWithAgent(agent as AgentId, fullSessionId, finalMessage);
     return NextResponse.json({ reply });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Agent error";

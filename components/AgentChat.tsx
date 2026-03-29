@@ -130,6 +130,7 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose }
         agent: agent.toLowerCase(),
         message: text,
         sessionId,
+        newSession: messages.length === 0,
       });
       if (!res.ok) {
         const text = await res.text();
