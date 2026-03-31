@@ -25,7 +25,7 @@ export interface ComplianceResult {
 
 export const ACCENT_COLORS: Record<string, string> = {
   Analysis: "#fe6203",
-  Projects: "#fe43a7",
+  Projects: "#4361ee",
   Culture:  "#fe43a7",
 };
 
