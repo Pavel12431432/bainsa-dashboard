@@ -147,12 +147,10 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
                 <StoryCard story={story} />
 
                 {approved && (
-                  <div className="absolute inset-0 rounded-2xl border-2 border-success pointer-events-none" />
+                  <div className="absolute inset-0 rounded-2xl border border-success/30 pointer-events-none" style={{ boxShadow: "0 0 16px rgba(34,197,94,0.4), 0 0 40px rgba(34,197,94,0.15)" }} />
                 )}
                 {rejected && (
-                  <div className="absolute inset-0 rounded-2xl border-2 border-danger bg-black/45 pointer-events-none flex items-center justify-center">
-                    <span className="text-danger text-2xl font-bold">✕</span>
-                  </div>
+                  <div className="absolute inset-0 rounded-2xl border border-danger/25 bg-black/45 pointer-events-none" style={{ boxShadow: "0 0 16px rgba(239,68,68,0.35), 0 0 40px rgba(239,68,68,0.12)" }} />
                 )}
                 {!compliance.pass && (
                   <div className="absolute bottom-2 left-2 right-2 pointer-events-none">
