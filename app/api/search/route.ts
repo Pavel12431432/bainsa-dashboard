@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     .sort()
     .reverse(); // newest first
 
-  const results: { date: string; index: number; title: string; headline: string }[] = [];
+  const results: { date: string; index: number; headline: string }[] = [];
 
   for (const file of storyFiles) {
     if (results.length >= 20) break;
@@ -28,9 +28,9 @@ export async function GET(req: NextRequest) {
 
     for (const story of stories) {
       if (results.length >= 20) break;
-      const haystack = `${story.title} ${story.headline} ${story.body} ${story.sourceTag}`.toLowerCase();
+      const haystack = `${story.headline} ${story.body} ${story.sourceTag}`.toLowerCase();
       if (haystack.includes(q)) {
-        results.push({ date, index: story.index, title: story.title, headline: story.headline });
+        results.push({ date, index: story.index, headline: story.headline });
       }
     }
   }

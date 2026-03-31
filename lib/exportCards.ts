@@ -61,7 +61,7 @@ export async function captureStories(
   for (let i = 0; i < stories.length; i++) {
     const story = stories[i];
     const blob = await captureCard(story, html2canvas);
-    blobs.push({ blob, filename: `story-${story.index}-${sanitizeTitle(story.title)}.png` });
+    blobs.push({ blob, filename: `story-${story.index}-${sanitizeTitle(story.headline)}.png` });
     onProgress?.(i + 1, stories.length);
   }
 

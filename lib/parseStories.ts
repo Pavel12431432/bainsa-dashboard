@@ -14,11 +14,11 @@ export function parseStories(markdown: string): Story[] {
   const sections = markdown.split(/\n---\n/);
 
   for (const section of sections) {
-    const titleMatch = section.match(/^##\s+Story\s+(\d+):\s+(.+)/m);
+    const titleMatch = section.match(/^##\s+Story\s+(\d+)(?::\s+(.+))?/m);
     if (!titleMatch) continue;
 
     const index = parseInt(titleMatch[1], 10);
-    const title = titleMatch[2].trim();
+    const title = titleMatch[2]?.trim() ?? "";
 
     // Check for embedded JSON block
     const jsonMatch = section.match(/```json\s*([\s\S]+?)\s*```/);

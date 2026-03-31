@@ -9,7 +9,6 @@ type Agent = "MARCO" | "SOFIA";
 interface SearchResult {
   date: string;
   index: number;
-  title: string;
   headline: string;
 }
 

@@ -82,7 +82,7 @@ export default function ExportDialog({ stories, date, onClose }: Props) {
                 className="w-3.5 h-3.5 rounded cursor-pointer accent-brand-white"
               />
               <span className="flex-1 text-[0.8rem] text-brand-white opacity-60 group-hover:opacity-90 transition-opacity leading-tight">
-                {story.index}. {story.title}
+                {story.index}. {story.headline}
               </span>
               <span
                 className="w-2.5 h-2.5 rounded-full shrink-0"

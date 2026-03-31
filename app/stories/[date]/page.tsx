@@ -8,6 +8,8 @@ import { requireEnv } from "@/lib/env";
 import StoryGrid from "@/components/StoryGrid";
 import HeaderShell from "@/components/HeaderShell";
 
+export const dynamic = "force-dynamic";
+
 interface Props {
   params: Promise<{ date: string }>;
   searchParams: Promise<{ highlight?: string }>;

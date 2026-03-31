@@ -146,6 +146,11 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose }
       fetch(`/api/agent-status?date=${date}`)
         .then((r) => r.json())
         .then((data) => setStatus(data));
+
+      // Signal StoryGrid to check for file changes (Sofia may have edited stories)
+      if (agent === "SOFIA") {
+        document.dispatchEvent(new CustomEvent("stories-changed"));
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Something went wrong";
       const withError = [...withUser, { role: "assistant" as const, content: `Error: ${msg}` }];

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Story, ApprovalState } from "@/types";
 import { apiFetch } from "@/lib/fetch";
 import { checkCompliance } from "@/lib/compliance";
@@ -8,6 +8,12 @@ import StoryCard from "./StoryCard";
 import ComplianceBadge from "./ComplianceBadge";
 import StoryEditor from "./StoryEditor";
 import ExportDialog from "./ExportDialog";
+
+const STORY_FIELDS = ["headline", "body", "sourceTag", "division", "cornerAccent", "accentColor"] as const;
+
+function storyChanged(a: Story, b: Story): string[] {
+  return STORY_FIELDS.filter((f) => a[f] !== b[f]) as string[];
+}
 
 interface Props {
   date: string;
@@ -37,6 +43,49 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
   const [approvals, setApprovals] = useState<ApprovalState>(initialApprovals);
   const [editing, setEditing] = useState<Story | null>(null);
   const [showExport, setShowExport] = useState(false);
+
+  // Re-fetch stories when Sofia edits files via agent chat
+  const refreshStories = useCallback(async () => {
+    // Small delay to let Sofia's file writes flush
+    await new Promise((r) => setTimeout(r, 500));
+    try {
+      const res = await fetch(`/api/stories/${date}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const fresh: Story[] = data.stories;
+      if (!fresh.length) return;
+
+      // Diff and record history for changed stories
+      for (const newStory of fresh) {
+        const old = stories.find((s) => s.index === newStory.index);
+        if (!old) continue;
+        const changed = storyChanged(old, newStory);
+        if (changed.length === 0) continue;
+
+        // Record original if no history exists yet
+        const histUrl = `/api/stories/${date}/${newStory.index}/history`;
+        const histRes = await fetch(histUrl);
+        if (histRes.ok) {
+          const entries = await histRes.json();
+          if (entries.length === 0) {
+            await apiFetch(histUrl, { story: old, label: "Original" });
+          }
+        }
+        // Record the Sofia chat edit
+        const label = `Sofia (chat): ${changed.join(", ")}`;
+        await apiFetch(histUrl, { story: newStory, label });
+      }
+
+      setStories(fresh);
+      if (data.approvals) setApprovals(data.approvals);
+    } catch {}
+  }, [date, stories]);
+
+  useEffect(() => {
+    const handler = () => { refreshStories(); };
+    document.addEventListener("stories-changed", handler);
+    return () => document.removeEventListener("stories-changed", handler);
+  }, [refreshStories]);
 
   async function handleApprove(index: number, action: "approve" | "reject" | "clear") {
     const res = await apiFetch(`/api/stories/${date}/${index}/approve`, { action });
@@ -111,11 +160,6 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
                   </div>
                 )}
               </div>
-
-              {/* Title */}
-              <p className="text-brand-white text-[0.8rem] opacity-50 m-0 leading-tight">
-                {story.index}. {story.title}
-              </p>
 
               {/* Action buttons */}
               <div className="flex gap-2">
