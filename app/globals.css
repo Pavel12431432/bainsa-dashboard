@@ -1,5 +1,27 @@
 @import "tailwindcss";
 
+/* ── Brand fonts ─────────────────────────────────────────────── */
+@font-face {
+  font-family: "Alliance No.1";
+  src: url("/fonts/alliance-no1-regular.otf") format("opentype");
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Alliance No.1";
+  src: url("/fonts/alliance-no1-semibold.otf") format("opentype");
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Alliance No.2";
+  src: url("/fonts/alliance-no2-semibold.otf") format("opentype");
+  font-weight: 600;
+  font-display: swap;
+}
+
 /* ── Design tokens ───────────────────────────────────────────── */
 :root {
   --brand-black:       #0a0a0a;
@@ -68,6 +90,12 @@ body {
   display: flex;
   flex-direction: column;
   padding: var(--card-pad);
+  font-family: "Alliance No.1", system-ui, sans-serif;
+}
+
+.story-content .story-headline,
+.story-content .story-logo {
+  font-family: "Alliance No.2", system-ui, sans-serif;
 }
 
 /* ── Login button (activates when password field has content) ── */

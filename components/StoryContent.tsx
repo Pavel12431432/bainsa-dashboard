@@ -28,7 +28,7 @@ export default function StoryContent({ story }: { story: Story }) {
 
       {/* Header row */}
       <div className="flex items-center justify-between pt-3 mb-auto">
-        <span className="text-[length:var(--text-logo)] font-semibold text-brand-white tracking-[0.08em]">
+        <span className="story-logo text-[length:var(--text-logo)] font-semibold text-brand-white tracking-[0.08em]">
           BAINSA
         </span>
         {cornerAccent === "+" ? (
@@ -42,7 +42,7 @@ export default function StoryContent({ story }: { story: Story }) {
       <div className="grow-0 shrink basis-[60px] flex-[1_0_60px]" />
 
       {/* Headline */}
-      <p className="text-[length:var(--text-headline)] font-semibold text-brand-white leading-[1.15] m-0 text-left">
+      <p className="story-headline text-[length:var(--text-headline)] font-semibold text-brand-white leading-[1.15] m-0 text-left">
         {headline}
       </p>
 
