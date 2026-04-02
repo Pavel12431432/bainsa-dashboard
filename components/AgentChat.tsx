@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { apiFetch } from "@/lib/fetch";
 import { renderMarkdown } from "@/lib/markdown";
 import SlidePanel from "./SlidePanel";
@@ -32,6 +32,8 @@ interface Props {
   outputExpanded: boolean;
   onClose: () => void;
   onSwitchAgent: (agent: Agent) => void;
+  onLoadingChange: (agent: Agent, loading: boolean) => void;
+  agentLoading: Record<string, boolean>;
 }
 
 function getSessionId(date: string, agent: string): string {
@@ -48,15 +50,15 @@ function messagesKey(date: string, agent: string, sessionId: string) {
   return `agent-chat:${date}:${agent}:${sessionId}`;
 }
 
-export default function AgentChat({ date, open, agent, outputExpanded, onClose, onSwitchAgent }: Props) {
+export default function AgentChat({ date, open, agent, outputExpanded, onClose, onSwitchAgent, onLoadingChange, agentLoading }: Props) {
   const [status, setStatus] = useState<Status | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
   const [expanded, setExpanded] = useState(outputExpanded);
   const [outputHeight, setOutputHeight] = useState(200);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const isLoading = agent ? agentLoading[agent] : false;
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const loaded = useRef(false);
@@ -85,7 +87,6 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
     const agentLower = agent.toLowerCase();
     const sid = getSessionId(date, agentLower);
     setSessionId(sid);
-    setLoading(false);
     try {
       const stored = localStorage.getItem(messagesKey(date, agentLower, sid));
       setMessages(stored ? JSON.parse(stored) : []);
@@ -95,14 +96,13 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
     loaded.current = true;
   }, [open, agent, date]);
 
-  const persist = useCallback(
-    (msgs: Message[]) => {
-      if (loaded.current && agent && sessionId) {
-        localStorage.setItem(messagesKey(date, agent.toLowerCase(), sessionId), JSON.stringify(msgs));
-      }
-    },
-    [date, agent, sessionId],
-  );
+  function persistMessages(msgs: Message[], forAgent?: string, forSessionId?: string) {
+    const a = forAgent ?? agent?.toLowerCase();
+    const sid = forSessionId ?? sessionId;
+    if (loaded.current && a && sid) {
+      localStorage.setItem(messagesKey(date, a, sid), JSON.stringify(msgs));
+    }
+  }
 
   // Auto-scroll — instant on agent switch, smooth during conversation
   const switching = useRef(false);
@@ -114,7 +114,7 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
     } else {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages, loading]);
+  }, [messages, isLoading]);
 
   function autoResize() {
     const el = inputRef.current;
@@ -125,21 +125,27 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
 
   async function send() {
     const text = input.trim();
-    if (!text || loading || !agent || !sessionId) return;
+    if (!text || isLoading || !agent || !sessionId) return;
+
+    // Capture at call time so closure works even if drawer closes mid-request
+    const currentAgent = agent;
+    const currentAgentLower = agent.toLowerCase();
+    const currentSessionId = sessionId;
+    const isNewSession = messages.length === 0;
 
     setInput("");
     if (inputRef.current) inputRef.current.style.height = "auto";
     const withUser = [...messages, { role: "user" as const, content: text }];
     setMessages(withUser);
-    persist(withUser);
-    setLoading(true);
+    persistMessages(withUser, currentAgentLower, currentSessionId);
+    onLoadingChange(currentAgent, true);
 
     try {
       const res = await apiFetch("/api/agent-chat", {
-        agent: agent.toLowerCase(),
+        agent: currentAgentLower,
         message: text,
-        sessionId,
-        newSession: messages.length === 0,
+        sessionId: currentSessionId,
+        newSession: isNewSession,
       });
       if (!res.ok) {
         const text = await res.text();
@@ -151,7 +157,7 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
 
       const withReply = [...withUser, { role: "assistant" as const, content: reply }];
       setMessages(withReply);
-      persist(withReply);
+      persistMessages(withReply, currentAgentLower, currentSessionId);
 
       // Refetch agent status so collapsible output updates if agent modified files
       fetch(`/api/agent-status?date=${date}`)
@@ -164,9 +170,9 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
       const msg = err instanceof Error ? err.message : "Something went wrong";
       const withError = [...withUser, { role: "assistant" as const, content: `Error: ${msg}` }];
       setMessages(withError);
-      persist(withError);
+      persistMessages(withError, currentAgentLower, currentSessionId);
     } finally {
-      setLoading(false);
+      onLoadingChange(currentAgent, false);
       inputRef.current?.focus();
     }
   }
@@ -295,7 +301,7 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3 min-h-0">
-          {messages.length === 0 && !loading && (
+          {messages.length === 0 && !isLoading && (
             <p className="text-xs text-muted text-center mt-8 leading-relaxed">
               {agent === "MARCO"
                 ? "Ask Marco about today's news."
@@ -322,7 +328,7 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
             </div>
           ))}
 
-          {loading && (
+          {isLoading && (
             <div className="self-start bg-border rounded-lg px-3 py-2 text-xs text-muted animate-pulse">
               {agent === "MARCO" ? "Marco" : "Sofia"} is thinking...
             </div>
@@ -346,7 +352,7 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
             />
             <button
               onClick={send}
-              disabled={!input.trim() || loading}
+              disabled={!input.trim() || isLoading}
               className="px-3 py-2 rounded-md text-xs font-semibold shrink-0 bg-brand-white text-brand-black disabled:bg-border-mid disabled:text-muted disabled:cursor-not-allowed cursor-pointer"
             >
               Send
