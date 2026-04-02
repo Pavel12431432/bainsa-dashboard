@@ -54,9 +54,7 @@ export default function HeaderShell({ date }: { date: string }) {
         </button>
 
         {/* Logo */}
-        <span className="text-base font-semibold text-brand-white tracking-[0.08em]">
-          BAINSA
-        </span>
+        <img src="/bainsa-logo.png" alt="BAINSA" className="h-9 mt-0.5 opacity-90" />
 
         {/* Date nav — centered overlay on desktop, inline on mobile */}
         <div className="absolute inset-x-0 flex justify-center pointer-events-none max-sm:contents">
