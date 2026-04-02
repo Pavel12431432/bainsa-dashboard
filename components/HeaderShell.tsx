@@ -83,6 +83,7 @@ export default function HeaderShell({ date }: { date: string }) {
         agent={activeAgent}
         outputExpanded={outputExpanded}
         onClose={close}
+        onSwitchAgent={(a) => openAgent(a, false)}
       />
     </>
   );

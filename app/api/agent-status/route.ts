@@ -27,7 +27,7 @@ export async function GET(req: Request) {
 
   const [marco, sofia] = await Promise.all([
     getStatus(`${marcoPath}/${date}.md`, (c) => (c.match(/^## Story \d+:/gm) ?? []).length),
-    getStatus(`${sofiaPath}/${date}.md`, (c) => (c.match(/^## Story \d+:/gm) ?? []).length),
+    getStatus(`${sofiaPath}/${date}.md`, (c) => (c.match(/^## Story \d+/gm) ?? []).length),
   ]);
 
   return NextResponse.json({ marco, sofia });

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { apiFetch } from "@/lib/fetch";
 import { renderMarkdown } from "@/lib/markdown";
 import SlidePanel from "./SlidePanel";
-import AgentStatusBadge from "./AgentStatusBadge";
+
 
 type Agent = "MARCO" | "SOFIA";
 
@@ -31,6 +31,7 @@ interface Props {
   agent: Agent | null;
   outputExpanded: boolean;
   onClose: () => void;
+  onSwitchAgent: (agent: Agent) => void;
 }
 
 function getSessionId(date: string, agent: string): string {
@@ -47,7 +48,7 @@ function messagesKey(date: string, agent: string, sessionId: string) {
   return `agent-chat:${date}:${agent}:${sessionId}`;
 }
 
-export default function AgentChat({ date, open, agent, outputExpanded, onClose }: Props) {
+export default function AgentChat({ date, open, agent, outputExpanded, onClose, onSwitchAgent }: Props) {
   const [status, setStatus] = useState<Status | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
   const [expanded, setExpanded] = useState(outputExpanded);
@@ -137,8 +138,10 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose }
         try { throw new Error(JSON.parse(text).error); } catch { throw new Error(`Server error (${res.status})`); }
       }
       const data = await res.json();
+      const reply = data.reply?.trim();
+      if (!reply) throw new Error("Empty response — try again");
 
-      const withReply = [...withUser, { role: "assistant" as const, content: data.reply }];
+      const withReply = [...withUser, { role: "assistant" as const, content: reply }];
       setMessages(withReply);
       persist(withReply);
 
@@ -213,11 +216,39 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose }
   const current = agent === "MARCO" ? status?.marco : status?.sofia;
   const label = agent === "MARCO" ? "articles" : "stories";
 
+  const tabs = (
+    <div className="flex gap-0.5">
+      {(["MARCO", "SOFIA"] as Agent[]).map((a) => {
+        const active = agent === a;
+        const st = a === "MARCO" ? status?.marco : status?.sofia;
+        return (
+          <button
+            key={a}
+            onClick={() => { if (!active) onSwitchAgent(a); }}
+            className={`flex items-center gap-2 px-3 py-1 rounded text-xs font-semibold tracking-[0.06em] border-none cursor-pointer transition-colors duration-150 ${
+              active
+                ? "bg-border-light text-brand-white"
+                : "bg-transparent text-brand-white opacity-40 hover:opacity-70"
+            }`}
+          >
+            {a}
+            {!statusLoading && st && (
+              <div
+                className="w-[5px] h-[5px] rounded-full shrink-0"
+                style={{ background: st.ranToday ? "#22c55e" : "#555" }}
+              />
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+
   return (
     <SlidePanel
       side="right"
       open={open}
-      title={<AgentStatusBadge agent={agent ?? "AGENT"} status={current} loading={statusLoading} />}
+      title={tabs}
       onClose={onClose}
     >
       <div className="flex flex-col h-full min-h-0">
