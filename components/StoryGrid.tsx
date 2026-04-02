@@ -273,20 +273,19 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
         })}
       </div>
 
-      {approvedStories.length > 0 && (
-        <div className="mt-10 flex justify-center">
-          <button
-            onClick={() => setShowExport(true)}
-            className="px-6 py-3 rounded-lg border border-border-mid bg-transparent text-brand-white text-xs font-semibold tracking-[0.06em] cursor-pointer hover:bg-border transition-colors duration-150"
-          >
-            EXPORT APPROVED ({approvedStories.length})
-          </button>
-        </div>
-      )}
+      <div className="mt-10 flex justify-center">
+        <button
+          onClick={() => setShowExport(true)}
+          className="px-6 py-3 rounded-lg border border-border-mid bg-transparent text-brand-white text-xs font-semibold tracking-[0.06em] cursor-pointer hover:bg-border transition-colors duration-150"
+        >
+          {approvedStories.length > 0 ? `EXPORT (${approvedStories.length} approved)` : "EXPORT"}
+        </button>
+      </div>
 
       {showExport && (
         <ExportDialog
-          stories={approvedStories}
+          stories={stories}
+          approvedIndices={approvals.approved}
           date={date}
           onClose={() => setShowExport(false)}
         />

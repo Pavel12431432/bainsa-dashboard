@@ -6,12 +6,17 @@ import { captureStories } from "@/lib/exportCards";
 
 interface Props {
   stories: Story[];
+  approvedIndices?: number[];
   date: string;
   onClose: () => void;
 }
 
-export default function ExportDialog({ stories, date, onClose }: Props) {
-  const [selected, setSelected] = useState<Set<number>>(new Set(stories.map((s) => s.index)));
+export default function ExportDialog({ stories, approvedIndices = [], date, onClose }: Props) {
+  const [selected, setSelected] = useState<Set<number>>(() => {
+    // Pre-select approved stories if any, otherwise select all
+    if (approvedIndices.length > 0) return new Set(approvedIndices);
+    return new Set(stories.map((s) => s.index));
+  });
   const [format, setFormat] = useState<"zip" | "individual">("zip");
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
@@ -75,12 +80,18 @@ export default function ExportDialog({ stories, date, onClose }: Props) {
               key={story.index}
               className="flex items-center gap-3 py-2.5 cursor-pointer group"
             >
-              <input
-                type="checkbox"
-                checked={selected.has(story.index)}
-                onChange={() => toggle(story.index)}
-                className="w-3.5 h-3.5 rounded cursor-pointer accent-brand-white"
-              />
+              <span
+                onClick={() => toggle(story.index)}
+                className={`w-3.5 h-3.5 rounded-sm border shrink-0 cursor-pointer flex items-center justify-center ${
+                  selected.has(story.index)
+                    ? "bg-border-mid border-border-mid"
+                    : "bg-transparent border-[#444]"
+                }`}
+              >
+                {selected.has(story.index) && (
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2.5 2.5L8 3" stroke="#999" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                )}
+              </span>
               <span className="flex-1 text-[0.8rem] text-brand-white opacity-60 group-hover:opacity-90 transition-opacity leading-tight">
                 {story.index}. {story.headline}
               </span>
@@ -92,14 +103,22 @@ export default function ExportDialog({ stories, date, onClose }: Props) {
           ))}
         </div>
 
-        {/* Select all / deselect all */}
+        {/* Quick selection */}
         <div className="px-6 pb-3 flex gap-3">
           <button onClick={selectAll} className="bg-transparent border-none text-[0.65rem] text-brand-white opacity-35 hover:opacity-60 cursor-pointer p-0">
             Select all
           </button>
           <button onClick={deselectAll} className="bg-transparent border-none text-[0.65rem] text-brand-white opacity-35 hover:opacity-60 cursor-pointer p-0">
-            Deselect all
+            Clear
           </button>
+          {approvedIndices.length > 0 && (
+            <button
+              onClick={() => setSelected(new Set(approvedIndices))}
+              className="bg-transparent border-none text-[0.65rem] text-success/70 hover:text-success cursor-pointer p-0"
+            >
+              Approved only
+            </button>
+          )}
         </div>
 
         {/* Format toggle */}
