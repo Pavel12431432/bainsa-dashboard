@@ -104,9 +104,16 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
     [date, agent, sessionId],
   );
 
-  // Auto-scroll
+  // Auto-scroll — instant on agent switch, smooth during conversation
+  const switching = useRef(false);
+  useEffect(() => { switching.current = true; }, [agent]);
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (switching.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "instant" });
+      switching.current = false;
+    } else {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages, loading]);
 
   function autoResize() {
