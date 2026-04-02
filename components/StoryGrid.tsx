@@ -24,6 +24,14 @@ interface Props {
 
 const actionBtn = "flex-1 py-[7px] rounded-[5px] text-xs font-semibold tracking-[0.04em] cursor-pointer";
 
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Rome",
+  });
+}
+
 export default function StoryGrid({ date, initialStories, initialApprovals, highlightIndex }: Props) {
   const [stories, setStories] = useState<Story[]>(initialStories);
   const highlightDone = useRef(false);
@@ -43,6 +51,46 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
   const [approvals, setApprovals] = useState<ApprovalState>(initialApprovals);
   const [editing, setEditing] = useState<Story | null>(null);
   const [showExport, setShowExport] = useState(false);
+  const [stale, setStale] = useState<string | null>(null); // Marco's lastRun if stale
+  const [regenerating, setRegenerating] = useState(false);
+
+  // Check if stories are stale (Marco updated after Sofia)
+  const checkStale = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/agent-status?date=${date}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.marco?.lastRun && data.sofia?.lastRun) {
+        if (new Date(data.marco.lastRun) > new Date(data.sofia.lastRun)) {
+          setStale(data.marco.lastRun);
+        } else {
+          setStale(null);
+        }
+      } else if (data.marco?.lastRun && !data.sofia?.ranToday) {
+        setStale(data.marco.lastRun);
+      }
+    } catch {}
+  }, [date]);
+
+  useEffect(() => { checkStale(); }, [checkStale]);
+
+  async function regenerate() {
+    setRegenerating(true);
+    try {
+      const sessionId = `regen-${Date.now()}`;
+      await apiFetch("/api/agent-chat", {
+        agent: "sofia",
+        message: "/new regenerate all stories from Marco's latest handoff",
+        sessionId,
+        newSession: true,
+      });
+      // Refetch stories and stale status
+      await refreshStories();
+      await checkStale();
+    } catch {} finally {
+      setRegenerating(false);
+    }
+  }
 
   // Re-fetch stories when Sofia edits files via agent chat
   const refreshStories = useCallback(async () => {
@@ -82,10 +130,10 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
   }, [date, stories]);
 
   useEffect(() => {
-    const handler = () => { refreshStories(); };
+    const handler = () => { refreshStories(); checkStale(); };
     document.addEventListener("stories-changed", handler);
     return () => document.removeEventListener("stories-changed", handler);
-  }, [refreshStories]);
+  }, [refreshStories, checkStale]);
 
   async function handleApprove(index: number, action: "approve" | "reject" | "clear") {
     const res = await apiFetch(`/api/stories/${date}/${index}/approve`, { action });
@@ -106,9 +154,24 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
           <h1 className="text-xl font-semibold text-brand-white m-0">Stories</h1>
           <p className="text-[0.8rem] text-brand-white opacity-35 mt-1">0 stories</p>
         </div>
-        <div className="text-left text-brand-white opacity-40 py-12">
-          No stories for this date — run Sofia to generate.
-        </div>
+        {stale ? (
+          <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-amber-500/25 bg-amber-500/5">
+            <span className="text-xs text-amber-400">
+              Marco has research ready — generate stories from his handoff
+            </span>
+            <button
+              onClick={regenerate}
+              disabled={regenerating}
+              className="ml-auto px-3 py-1.5 rounded text-xs font-semibold bg-amber-500/15 border border-amber-500/30 text-amber-400 cursor-pointer hover:bg-amber-500/25 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+            >
+              {regenerating ? "Generating..." : "Generate"}
+            </button>
+          </div>
+        ) : (
+          <div className="text-left text-brand-white opacity-40 py-12">
+            No stories for this date — run Sofia to generate.
+          </div>
+        )}
       </>
     );
   }
@@ -133,6 +196,21 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
           {approvals.approved.length} approved · {approvals.rejected.length} rejected
         </p>
       </div>
+
+      {stale && (
+        <div className="mb-6 flex items-center gap-3 px-4 py-3 rounded-lg border border-amber-500/25 bg-amber-500/5">
+          <span className="text-xs text-amber-400">
+            Marco updated research at {formatTime(stale)} — stories may be outdated
+          </span>
+          <button
+            onClick={regenerate}
+            disabled={regenerating}
+            className="ml-auto px-3 py-1.5 rounded text-xs font-semibold bg-amber-500/15 border border-amber-500/30 text-amber-400 cursor-pointer hover:bg-amber-500/25 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+          >
+            {regenerating ? "Regenerating..." : "Regenerate"}
+          </button>
+        </div>
+      )}
 
       <div className="grid gap-8 grid-cols-4 max-lg:grid-cols-[repeat(auto-fill,minmax(min(280px,100%),1fr))] max-sm:grid-cols-1 max-sm:max-w-[405px] max-sm:mx-auto">
         {stories.map((story) => {

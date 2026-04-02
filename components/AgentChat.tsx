@@ -85,6 +85,7 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
     const agentLower = agent.toLowerCase();
     const sid = getSessionId(date, agentLower);
     setSessionId(sid);
+    setLoading(false);
     try {
       const stored = localStorage.getItem(messagesKey(date, agentLower, sid));
       setMessages(stored ? JSON.parse(stored) : []);
@@ -150,10 +151,8 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
         .then((r) => r.json())
         .then((data) => setStatus(data));
 
-      // Signal StoryGrid to check for file changes (Sofia may have edited stories)
-      if (agent === "SOFIA") {
-        document.dispatchEvent(new CustomEvent("stories-changed"));
-      }
+      // Signal StoryGrid to refetch stories + stale status
+      document.dispatchEvent(new CustomEvent("stories-changed"));
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Something went wrong";
       const withError = [...withUser, { role: "assistant" as const, content: `Error: ${msg}` }];
