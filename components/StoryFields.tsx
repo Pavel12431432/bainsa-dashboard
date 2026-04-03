@@ -1,6 +1,7 @@
 "use client";
 
 import { Story } from "@/types";
+import { checkCompliance } from "@/lib/compliance";
 
 const DIVISIONS = ["Analysis", "Projects", "Culture"] as const;
 
@@ -11,9 +12,11 @@ interface Props {
 }
 
 export default function StoryFields({ draft, onUpdate, disabled }: Props) {
+  const compliance = checkCompliance(draft);
+
   return (
     <>
-      <Field label="HEADLINE">
+      <Field label="HEADLINE" warning={compliance.headlineOk.pass ? undefined : compliance.headlineOk.detail}>
         <textarea
           value={draft.headline}
           onChange={(e) => onUpdate("headline", e.target.value)}
@@ -24,7 +27,7 @@ export default function StoryFields({ draft, onUpdate, disabled }: Props) {
         <CharCount value={draft.headline} max={80} />
       </Field>
 
-      <Field label="BODY">
+      <Field label="BODY" warning={compliance.bodyOk.pass ? undefined : compliance.bodyOk.detail}>
         <textarea
           value={draft.body}
           onChange={(e) => onUpdate("body", e.target.value)}
@@ -35,7 +38,7 @@ export default function StoryFields({ draft, onUpdate, disabled }: Props) {
         <CharCount value={draft.body} max={240} />
       </Field>
 
-      <Field label="SOURCE TAG">
+      <Field label="SOURCE TAG" warning={compliance.sourcePresent.pass ? undefined : compliance.sourcePresent.detail}>
         <input
           type="text"
           value={draft.sourceTag}
@@ -73,6 +76,12 @@ export default function StoryFields({ draft, onUpdate, disabled }: Props) {
           </select>
         </Field>
       </div>
+
+      {!compliance.colorValid.pass && (
+        <p className="text-[0.6rem] font-semibold text-danger -mt-2 m-0">
+          {compliance.colorValid.detail}
+        </p>
+      )}
     </>
   );
 }
@@ -81,14 +90,23 @@ function Field({
   label,
   children,
   className,
+  warning,
 }: {
   label: string;
   children: React.ReactNode;
   className?: string;
+  warning?: string;
 }) {
   return (
     <div className={`flex flex-col gap-1.5 ${className ?? ""}`}>
-      <label className="text-[0.65rem] font-semibold text-muted tracking-[0.08em]">{label}</label>
+      <div className="flex items-center justify-between">
+        <label className="text-[0.65rem] font-semibold text-muted tracking-[0.08em]">{label}</label>
+        {warning && (
+          <span className="text-[0.6rem] font-semibold text-danger">
+            {warning}
+          </span>
+        )}
+      </div>
       {children}
     </div>
   );

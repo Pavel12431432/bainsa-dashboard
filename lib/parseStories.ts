@@ -1,7 +1,7 @@
 import { Story } from "@/types";
 
 function extractField(block: string, key: string): string {
-  const re = new RegExp(`\\*\\*${key}:\\*\\*\\s*(.+)`, "i");
+  const re = new RegExp(`\\*\\*${key}:\\*\\*[ \\t]*(.+)`, "i");
   const m = block.match(re);
   return m ? m[1].trim() : "";
 }

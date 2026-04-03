@@ -15,11 +15,16 @@ export interface ApprovalState {
   rejected: number[];
 }
 
+export interface ComplianceCheck {
+  pass: boolean;
+  detail: string;        // human-readable explanation when failing
+}
+
 export interface ComplianceResult {
-  colorValid: boolean;
-  headlineOk: boolean;   // ≤ 60 chars
-  bodyOk: boolean;       // ≤ 180 chars
-  sourcePresent: boolean;
+  colorValid: ComplianceCheck;
+  headlineOk: ComplianceCheck;
+  bodyOk: ComplianceCheck;
+  sourcePresent: ComplianceCheck;
   pass: boolean;         // all checks pass
 }
 

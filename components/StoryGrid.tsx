@@ -221,7 +221,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
           const rejected = approvals.rejected.includes(story.index);
 
           return (
-            <div key={story.index} id={`story-${story.index}`} className="flex flex-col gap-3">
+            <div key={story.index} id={`story-${story.index}`} className="flex flex-col gap-3 [&:has(.group:hover)]:z-10">
               {/* Card */}
               <div className="relative w-full">
                 <StoryCard story={story} />
@@ -233,7 +233,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
                   <div className="absolute inset-0 rounded-2xl border border-danger/25 bg-black/45 pointer-events-none" style={{ boxShadow: "0 0 16px rgba(239,68,68,0.35), 0 0 40px rgba(239,68,68,0.12)" }} />
                 )}
                 {!compliance.pass && (
-                  <div className="absolute bottom-2 left-2 right-2 pointer-events-none">
+                  <div className="absolute bottom-2 left-2 right-2">
                     <ComplianceBadge result={compliance} />
                   </div>
                 )}
