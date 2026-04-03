@@ -32,8 +32,18 @@ function formatTime(iso: string): string {
   });
 }
 
+type Division = "All" | "Projects" | "Analysis" | "Culture";
+const DIVISIONS: Division[] = ["All", "Projects", "Culture", "Analysis"];
+const DIVISION_COLORS: Record<Division, string> = {
+  All: "",
+  Projects: "#2c40e8",
+  Culture: "#fe43a7",
+  Analysis: "#fe6203",
+};
+
 export default function StoryGrid({ date, initialStories, initialApprovals, highlightIndex }: Props) {
   const [stories, setStories] = useState<Story[]>(initialStories);
+  const [divisionFilter, setDivisionFilter] = useState<Division>("All");
   const highlightDone = useRef(false);
 
   useEffect(() => {
@@ -178,6 +188,17 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
   }
 
   const approvedStories = stories.filter((s) => approvals.approved.includes(s.index));
+  const visibleStories = divisionFilter === "All"
+    ? stories
+    : stories.filter((s) => s.division === divisionFilter);
+
+  // Count stories per division for the filter pills
+  const divisionCounts: Record<Division, number> = {
+    All: stories.length,
+    Projects: stories.filter((s) => s.division === "Projects").length,
+    Culture: stories.filter((s) => s.division === "Culture").length,
+    Analysis: stories.filter((s) => s.division === "Analysis").length,
+  };
 
   return (
     <>
@@ -190,12 +211,43 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
         />
       )}
 
-      <div className="mb-8">
-        <h1 className="text-xl font-semibold text-brand-white m-0">Stories</h1>
-        <p className="text-[0.8rem] text-brand-white opacity-35 mt-1">
-          {stories.length} {stories.length === 1 ? "story" : "stories"} ·{" "}
-          {approvals.approved.length} approved · {approvals.rejected.length} rejected
-        </p>
+      <div className="mb-8 flex items-end justify-between gap-4 max-sm:flex-col max-sm:items-start max-sm:gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-brand-white m-0">Stories</h1>
+          <p className="text-[0.8rem] text-brand-white opacity-35 mt-1">
+            {stories.length} {stories.length === 1 ? "story" : "stories"} ·{" "}
+            {approvals.approved.length} approved · {approvals.rejected.length} rejected
+          </p>
+        </div>
+
+        {/* Division filter */}
+        {stories.length > 0 && (
+          <div className="flex gap-1.5">
+            {DIVISIONS.map((d) => {
+              const active = divisionFilter === d;
+              const count = divisionCounts[d];
+              if (d !== "All" && count === 0) return null;
+              const color = DIVISION_COLORS[d];
+              return (
+                <button
+                  key={d}
+                  onClick={() => setDivisionFilter(active ? "All" : d)}
+                  className="px-3 py-1.5 rounded-full text-[0.65rem] font-semibold tracking-[0.04em] border cursor-pointer transition-all duration-150"
+                  style={{
+                    background: active && color ? `${color}15` : "transparent",
+                    borderColor: active && color ? `${color}40` : active ? "var(--color-border-mid)" : "var(--color-border)",
+                    color: active && color ? color : active ? "var(--brand-white)" : "var(--color-muted)",
+                  }}
+                >
+                  {d === "All" ? "All" : d}
+                  {d !== "All" && (
+                    <span className="ml-1.5 opacity-50">{count}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {stale && (
@@ -215,13 +267,13 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
       )}
 
       <div className="grid gap-8 grid-cols-4 max-lg:grid-cols-[repeat(auto-fill,minmax(min(280px,100%),1fr))] max-sm:grid-cols-1 max-sm:max-w-[405px] max-sm:mx-auto">
-        {stories.map((story) => {
+        {visibleStories.map((story) => {
           const compliance = checkCompliance(story);
           const approved = approvals.approved.includes(story.index);
           const rejected = approvals.rejected.includes(story.index);
 
           return (
-            <div key={story.index} id={`story-${story.index}`} className="flex flex-col gap-3 [&:has(.group:hover)]:z-10">
+            <div key={story.index} id={`story-${story.index}`} className="group/card">
               {/* Card */}
               <div className="relative w-full">
                 <StoryCard story={story} />
@@ -233,40 +285,40 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
                   <div className="absolute inset-0 rounded-2xl border border-danger/25 bg-black/45 pointer-events-none" style={{ boxShadow: "0 0 16px rgba(239,68,68,0.35), 0 0 40px rgba(239,68,68,0.12)" }} />
                 )}
                 {!compliance.pass && (
-                  <div className="absolute bottom-2 left-2 right-2">
+                  <div className="absolute bottom-2 left-2 right-2 group-hover/card:opacity-0 transition-opacity duration-150">
                     <ComplianceBadge result={compliance} />
                   </div>
                 )}
-              </div>
 
-              {/* Action buttons */}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setEditing(story)}
-                  className={`${actionBtn} border border-border-mid bg-transparent text-brand-white`}
-                >
-                  EDIT
-                </button>
-                <button
-                  onClick={() => handleApprove(story.index, approved ? "clear" : "approve")}
-                  className={`${actionBtn} border ${
-                    approved
-                      ? "border-success bg-success/10 text-success"
-                      : "border-border-mid bg-transparent text-brand-white"
-                  }`}
-                >
-                  {approved ? "✓ APPROVED" : "APPROVE"}
-                </button>
-                <button
-                  onClick={() => handleApprove(story.index, rejected ? "clear" : "reject")}
-                  className={`${actionBtn} border ${
-                    rejected
-                      ? "border-danger bg-danger/10 text-danger"
-                      : "border-border-mid bg-transparent text-brand-white"
-                  }`}
-                >
-                  {rejected ? "✕ REJECTED" : "REJECT"}
-                </button>
+                {/* Action buttons — overlay bottom of card on hover */}
+                <div className="absolute bottom-0 left-0 right-0 rounded-b-2xl px-5 pb-5 pt-16 bg-gradient-to-t from-black/90 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity duration-150 flex gap-2">
+                  <button
+                    onClick={() => setEditing(story)}
+                    className={`${actionBtn} border border-border-mid bg-brand-black/80 text-brand-white backdrop-blur-sm`}
+                  >
+                    EDIT
+                  </button>
+                  <button
+                    onClick={() => handleApprove(story.index, approved ? "clear" : "approve")}
+                    className={`${actionBtn} border backdrop-blur-sm ${
+                      approved
+                        ? "border-success bg-success/20 text-success"
+                        : "border-border-mid bg-brand-black/80 text-brand-white"
+                    }`}
+                  >
+                    {approved ? "✓" : "APPROVE"}
+                  </button>
+                  <button
+                    onClick={() => handleApprove(story.index, rejected ? "clear" : "reject")}
+                    className={`${actionBtn} border backdrop-blur-sm ${
+                      rejected
+                        ? "border-danger bg-danger/20 text-danger"
+                        : "border-border-mid bg-brand-black/80 text-brand-white"
+                    }`}
+                  >
+                    {rejected ? "✕" : "REJECT"}
+                  </button>
+                </div>
               </div>
             </div>
           );
