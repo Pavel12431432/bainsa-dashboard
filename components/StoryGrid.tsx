@@ -290,8 +290,8 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
                   </div>
                 )}
 
-                {/* Action buttons — overlay bottom of card on hover */}
-                <div className="absolute bottom-0 left-0 right-0 rounded-b-2xl px-5 pb-5 pt-16 bg-gradient-to-t from-black/90 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity duration-150 flex gap-2">
+                {/* Action buttons — overlay bottom of card on hover (desktop only) */}
+                <div className="hidden sm:flex absolute bottom-0 left-0 right-0 rounded-b-2xl px-5 pb-5 pt-16 bg-gradient-to-t from-black/90 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity duration-150 gap-2">
                   <button
                     onClick={() => setEditing(story)}
                     className={`${actionBtn} border border-border-mid bg-brand-black/80 text-brand-white backdrop-blur-sm`}
@@ -319,6 +319,36 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
                     {rejected ? "✕" : "REJECT"}
                   </button>
                 </div>
+              </div>
+
+              {/* Action buttons — below card (mobile only) */}
+              <div className="flex sm:hidden gap-2 mt-2">
+                <button
+                  onClick={() => setEditing(story)}
+                  className={`${actionBtn} border border-border-mid bg-brand-black text-brand-white`}
+                >
+                  EDIT
+                </button>
+                <button
+                  onClick={() => handleApprove(story.index, approved ? "clear" : "approve")}
+                  className={`${actionBtn} border ${
+                    approved
+                      ? "border-success bg-success/20 text-success"
+                      : "border-border-mid bg-brand-black text-brand-white"
+                  }`}
+                >
+                  {approved ? "✓" : "APPROVE"}
+                </button>
+                <button
+                  onClick={() => handleApprove(story.index, rejected ? "clear" : "reject")}
+                  className={`${actionBtn} border ${
+                    rejected
+                      ? "border-danger bg-danger/20 text-danger"
+                      : "border-border-mid bg-brand-black text-brand-white"
+                  }`}
+                >
+                  {rejected ? "✕" : "REJECT"}
+                </button>
               </div>
             </div>
           );
