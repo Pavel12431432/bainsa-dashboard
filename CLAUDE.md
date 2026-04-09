@@ -233,7 +233,8 @@ const ACCENT_COLORS = { Analysis: "#fe6203", Projects: "#2c40e8", Culture: "#fe4
 | `StoryGrid.tsx` | 4-col grid (responsive). Approve/reject/edit buttons per card — hover overlay on desktop, separate row below card on mobile. Approved cards get green outer glow, rejected get red glow + dark overlay. Compliance badges on failing cards with hover tooltips (card column gets `z-10` on badge hover to prevent clipping). Stale stories banner when Marco ran after Sofia. Export button at bottom (shows approved count if any). Listens for `stories-changed` CustomEvent to refetch. |
 | `StoryCard.tsx` | Card shell: fixed scale (editor) or auto-scale via `useLayoutEffect` + `ResizeObserver` (grid). |
 | `StoryContent.tsx` | Inner 9:16 story design: accent border, BAINSA logo, chevron/plus SVG, headline (Alliance No.2), body, source. |
-| `StoryEditor.tsx` | Edit modal. Desktop: preview + form + chat (3 cols). Mobile: FIELDS/SOFIA tabs. Accept/revert for Sofia suggestions with inline diff (strikethrough old, green new). Version history with restore. |
+| `StoryEditor.tsx` | Edit modal. Desktop: preview + form + chat (3 cols). Preview has CARD/PHONE toggle (persisted to localStorage) and fullscreen expand button. Mobile: FIELDS/SOFIA tabs. Accept/revert for Sofia suggestions with inline diff (strikethrough old, green new). Version history with restore. |
+| `PhonePreview.tsx` | Instagram phone preview: frameless rounded screen (405x880) with story content (via `StoryContent`) overlaid by real iOS chrome images (`ig-chrome-top.png`, `ig-chrome-bottom.png`), progress bar, and BAINSA profile row. Accepts `story` and optional `scale` prop. |
 | `StoryFields.tsx` | Form fields with inline compliance warnings. Headline/body have char counters. Color mismatch warning shown below division row. Source tag shows warning when empty. Runs `checkCompliance()` on every render. |
 | `StoryChat.tsx` | Chat panel for inline Sofia editing in story editor. Messages persisted to localStorage. |
 | `VersionTimeline.tsx` | Scrollable version history with dot indicators, time-ago labels, restore/back. |
@@ -282,7 +283,7 @@ StoryGrid (receives stories + approvals from server component)
 └── ExportDialog (modal)
 
 StoryEditor (modal, opened from EDIT button)
-├── StoryCard preview (desktop only)
+├── StoryCard / PhonePreview toggle (desktop only, persisted to localStorage)
 ├── StoryFields (form with inline compliance warnings)
 │   ├── Sofia suggestion diff banner (accept/revert)
 │   └── VersionTimeline

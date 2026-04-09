@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Story, HistoryEntry, ACCENT_COLORS } from "@/types";
 import { apiFetch } from "@/lib/fetch";
 import StoryCard from "./StoryCard";
+import PhonePreview from "./PhonePreview";
 import StoryChat from "./StoryChat";
 import StoryFields from "./StoryFields";
 import VersionTimeline from "./VersionTimeline";
@@ -79,10 +80,21 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [tab, setTab] = useState<"fields" | "chat">("fields");
+  const [preview, setPreviewState] = useState<"card" | "phone">(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem("preview-mode") as "card" | "phone") || "card";
+    }
+    return "card";
+  });
+  const setPreview = (mode: "card" | "phone") => {
+    setPreviewState(mode);
+    localStorage.setItem("preview-mode", mode);
+  };
   const [sessionId, setSessionId] = useState("");
   const [pending, setPending] = useState<Pending | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const [viewingIdx, setViewingIdx] = useState<number | null>(null);
 
   const saved = useRef<Story>({ ...story });
@@ -226,9 +238,48 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
         onClick={(e) => e.stopPropagation()}
         className="bg-surface border border-border-light rounded-xl flex w-full max-w-[1200px] max-h-[90vh] overflow-hidden max-md:flex-col max-md:max-w-none max-md:max-h-none max-md:h-full max-md:rounded-none max-md:border-none"
       >
-        {/* Preview — hidden below lg */}
-        <div className="p-8 bg-brand-black flex flex-col items-center justify-center shrink-0 border-r border-border max-lg:hidden">
-          <StoryCard story={draft} scale={0.72} />
+        {/* Preview — hidden below lg, fixed-size container so toggling doesn't shift layout */}
+        <div className="p-8 bg-brand-black flex flex-col items-center justify-center shrink-0 border-r border-border max-lg:hidden gap-4">
+          <div className="flex items-center justify-center" style={{ width: 292, height: 518 }}>
+            <div className="group/preview relative">
+              {preview === "card" ? (
+                <StoryCard story={draft} scale={0.72} />
+              ) : (
+                <PhonePreview story={draft} scale={0.58} />
+              )}
+              <button
+                onClick={() => setFullscreen(true)}
+                className="absolute top-2 right-2 p-1.5 rounded-md bg-black/50 border-none cursor-pointer opacity-0 group-hover/preview:opacity-60 hover:!opacity-100 transition-opacity duration-150"
+                style={{ zIndex: 30 }}
+                title="Fullscreen preview"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 1 13 1 13 5" />
+                  <polyline points="5 13 1 13 1 9" />
+                  <line x1="13" y1="1" x2="8.5" y2="5.5" />
+                  <line x1="1" y1="13" x2="5.5" y2="8.5" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div className="flex gap-1 bg-surface rounded-lg p-1">
+            <button
+              onClick={() => setPreview("card")}
+              className={`px-3 py-1.5 rounded-md text-[0.6rem] font-semibold tracking-[0.06em] border-none cursor-pointer transition-colors duration-150 ${
+                preview === "card" ? "bg-border-mid text-brand-white" : "bg-transparent text-muted hover:text-brand-white"
+              }`}
+            >
+              CARD
+            </button>
+            <button
+              onClick={() => setPreview("phone")}
+              className={`px-3 py-1.5 rounded-md text-[0.6rem] font-semibold tracking-[0.06em] border-none cursor-pointer transition-colors duration-150 ${
+                preview === "phone" ? "bg-border-mid text-brand-white" : "bg-transparent text-muted hover:text-brand-white"
+              }`}
+            >
+              PHONE
+            </button>
+          </div>
         </div>
 
         {/* Mobile tab bar */}
@@ -370,6 +421,31 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
           </div>
         )}
       </div>
+
+      {/* Fullscreen preview overlay */}
+      {fullscreen && (
+        <div
+          onClick={(e) => { e.stopPropagation(); setFullscreen(false); }}
+          className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center cursor-pointer"
+        >
+          <div onClick={(e) => e.stopPropagation()} className="cursor-default">
+            {preview === "card" ? (
+              <StoryCard story={draft} scale={1} />
+            ) : (
+              <PhonePreview story={draft} scale={0.85} />
+            )}
+          </div>
+          <button
+            onClick={() => setFullscreen(false)}
+            className="absolute top-6 right-6 bg-transparent border-none cursor-pointer text-white/60 hover:text-white transition-colors duration-150"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="4" y1="4" x2="20" y2="20" />
+              <line x1="20" y1="4" x2="4" y2="20" />
+            </svg>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
