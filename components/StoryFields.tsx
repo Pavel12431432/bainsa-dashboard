@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Story } from "@/types";
-import { checkCompliance } from "@/lib/compliance";
+import { checkCompliance, bodyMaxChars } from "@/lib/compliance";
 
 const DIVISIONS = ["Analysis", "Projects", "Culture"] as const;
 const LAYOUTS = [
@@ -78,7 +78,7 @@ export default function StoryFields({ draft, onUpdate, disabled }: Props) {
           disabled={disabled}
           className="bg-border border border-[#2a2a2a] rounded-[5px] px-3 py-2.5 text-brand-white text-sm leading-normal resize-y outline-none disabled:opacity-50"
         />
-        <CharCount value={draft.body} max={240} />
+        <CharCount value={draft.body} max={bodyMaxChars(draft.contentType)} />
       </Field>
 
       <Field label="SOURCE TAG" warning={compliance.sourcePresent.pass ? undefined : compliance.sourcePresent.detail}>

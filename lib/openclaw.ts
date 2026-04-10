@@ -5,8 +5,10 @@ const AGENT_CLI_NAMES = { marco: "news-researcher", sofia: "story-generator" } a
 export type AgentId = keyof typeof AGENT_CLI_NAMES;
 
 export function buildUserMessage(story: Story, instruction: string): string {
-  return `You are editing a BAINSA Instagram story card. Constraints: headline max 80 chars, body max 240 chars.
+  const bodyMax = story.contentType === "text" ? 300 : 200;
+  return `You are editing a BAINSA Instagram story card. Constraints: headline max 80 chars, body max depends on content type (text: 300, bullets: 200, quote: 200).
 Available JSON fields: headline, body, sourceTag, division, cornerAccent, layout, contentType, headlineSize, bodyWeight, textAlign, cornerSize, accentBar, ghostAccent.
+For bullets content type: each bullet line starts with "> ", use sentence case (capitalize first word), 2-3 bullets, each 5-10 words.
 - layout: "top" | "center" | "bottom"
 - contentType: "text" | "bullets" | "quote"
 - headlineSize: "large" | "default" | "compact"
@@ -16,11 +18,13 @@ Available JSON fields: headline, body, sourceTag, division, cornerAccent, layout
 - accentBar: "bottom" | "top" | "none"
 - ghostAccent: "none" | "bottom-right" | "center" | "top-left"
 
-When modifying the story, respond with a brief explanation then a JSON code block with ONLY changed fields. If no changes needed, just respond conversationally.
+When modifying the story, consider changing both content AND style fields to best fit the new content. For example, if rewriting the body, also consider whether a different layout, content type, headline size, or accent style would work better.
+
+Respond with a brief explanation then a JSON code block with ONLY changed fields. If no changes needed, just respond conversationally.
 
 Current story (#${story.index}):
 Headline (${story.headline.length}/80): "${story.headline}"
-Body (${story.body.length}/240): "${story.body}"
+Body (${story.body.length}/${bodyMax}): "${story.body}"
 Source: "${story.sourceTag}"
 Division: ${story.division}
 Corner accent: ${story.cornerAccent}

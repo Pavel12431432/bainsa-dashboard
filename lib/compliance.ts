@@ -1,4 +1,10 @@
-import { Story, ComplianceResult, ComplianceCheck, ACCENT_COLORS } from "@/types";
+import { Story, ComplianceResult, ComplianceCheck, ACCENT_COLORS, ContentType } from "@/types";
+
+const BODY_MAX: Record<ContentType, number> = {
+  text: 300,
+  bullets: 200,
+  quote: 200,
+};
 
 function ok(): ComplianceCheck {
   return { pass: true, detail: "" };
@@ -6,6 +12,10 @@ function ok(): ComplianceCheck {
 
 function fail(detail: string): ComplianceCheck {
   return { pass: false, detail };
+}
+
+export function bodyMaxChars(contentType: ContentType): number {
+  return BODY_MAX[contentType] ?? BODY_MAX.text;
 }
 
 export function checkCompliance(story: Story): ComplianceResult {
@@ -20,10 +30,11 @@ export function checkCompliance(story: Story): ComplianceResult {
       ? fail(`Headline too long: ${story.headline.length}/80 chars`)
       : ok();
 
+  const max = bodyMaxChars(story.contentType);
   const bodyOk = story.body.trim().length === 0
     ? fail("Body is empty")
-    : story.body.length > 240
-      ? fail(`Body too long: ${story.body.length}/240 chars`)
+    : story.body.length > max
+      ? fail(`Body too long: ${story.body.length}/${max} chars`)
       : ok();
 
   const sourcePresent = story.sourceTag.trim().length > 0
