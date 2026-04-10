@@ -151,7 +151,14 @@ Default when unclear: **Culture** (not Analysis). Analysis should be rare.
 
 **Division:** Culture
 **Accent color:** #fe43a7
-**Layout:** Headline top-left, body secondary, source bottom-right
+**Layout:** top
+**Content type:** text
+**Headline size:** default
+**Body weight:** regular
+**Text align:** left
+**Corner size:** small
+**Accent bar:** bottom
+**Ghost accent:** none
 
 **Headline:** AI funding keeps breaking records
 **Body:** Q1 2026 saw $242 billion pour into AI infrastructure and tools.
@@ -166,16 +173,32 @@ Sections separated by `\n---\n`. Parser also supports embedded JSON blocks (futu
 ## Data types (`types/index.ts`)
 
 ```typescript
+type Layout = "top" | "center" | "bottom";
+type ContentType = "text" | "bullets" | "quote";
+type HeadlineSize = "large" | "default" | "compact";
+type BodyWeight = "regular" | "semibold";
+type TextAlign = "left" | "justify";
+type CornerSize = "small" | "medium";
+type AccentBar = "bottom" | "top" | "none";
+type GhostAccent = "none" | "bottom-right" | "center" | "top-left";
+
 interface Story {
   index: number;           // 1-based
   title: string;           // legacy, usually empty
   division: "Analysis" | "Projects" | "Culture" | string;
   accentColor: string;     // hex e.g. "#2c40e8"
-  layoutTemplate: string;
   headline: string;        // max 80 chars
-  body: string;            // max 240 chars
+  body: string;            // max varies by contentType
   sourceTag: string;
   cornerAccent: ">" | "+";
+  layout: Layout;
+  contentType: ContentType;
+  headlineSize: HeadlineSize;
+  bodyWeight: BodyWeight;
+  textAlign: TextAlign;
+  cornerSize: CornerSize;
+  accentBar: AccentBar;
+  ghostAccent: GhostAccent;
 }
 
 interface ComplianceCheck {
@@ -186,7 +209,7 @@ interface ComplianceCheck {
 interface ComplianceResult {
   colorValid: ComplianceCheck;   // accentColor matches division canonical
   headlineOk: ComplianceCheck;   // > 0 and <= 80 chars
-  bodyOk: ComplianceCheck;       // > 0 and <= 240 chars
+  bodyOk: ComplianceCheck;       // > 0 and <= body max (content-type-aware)
   sourcePresent: ComplianceCheck;
   pass: boolean;
 }
@@ -248,7 +271,7 @@ const ACCENT_COLORS = { Analysis: "#fe6203", Projects: "#2c40e8", Culture: "#fe4
 |---|---|
 | `parseStories.ts` | Parses Sofia's markdown to `Story[]`. Regex `extractField()` uses `[ \t]*` (not `\s*`) to avoid cross-newline matching on empty fields. JSON blocks first, regex fallback. |
 | `serializeStories.ts` | `Story` to markdown (no colon/title in `## Story N` header). `replaceStory()` for in-place updates — regex matches `## Story \d+` (no colon). |
-| `compliance.ts` | `checkCompliance(story)` -> `ComplianceResult`. Each check returns `{ pass, detail }`. Checks: color matches division canonical, headline 0-80 chars, body 0-240 chars, source non-empty. |
+| `compliance.ts` | `checkCompliance(story)` -> `ComplianceResult`. Each check returns `{ pass, detail }`. Checks: color matches division canonical, headline 0-80 chars, body 0-max chars (content-type-aware: text=300, bullets=200, quote=200), source non-empty. Exports `bodyMaxChars(contentType)`. |
 | `exportCards.ts` | PNG export: renders `StoryContent` offscreen via `createRoot`, captures with html2canvas-pro at 4x scale, downloads individually or as ZIP. |
 | `approvals.ts` | Read/write approval JSON sidecars. |
 | `auth.ts` | Cookie name, token creation/verification (constant-time compare). |
