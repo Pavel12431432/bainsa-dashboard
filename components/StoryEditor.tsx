@@ -53,6 +53,11 @@ function diffFields(a: Story, b: Story): string[] {
   if (a.sourceTag !== b.sourceTag) fields.push("source");
   if (a.division !== b.division) fields.push("division");
   if (a.cornerAccent !== b.cornerAccent) fields.push("accent");
+  if (a.layout !== b.layout) fields.push("layout");
+  if (a.contentType !== b.contentType) fields.push("contentType");
+  if (a.headlineSize !== b.headlineSize) fields.push("headlineSize");
+  if (a.bodyWeight !== b.bodyWeight) fields.push("bodyWeight");
+  if (a.textAlign !== b.textAlign) fields.push("textAlign");
   return fields;
 }
 
@@ -63,7 +68,12 @@ function storyEqual(a: Story, b: Story): boolean {
     a.sourceTag === b.sourceTag &&
     a.division === b.division &&
     a.accentColor === b.accentColor &&
-    a.cornerAccent === b.cornerAccent
+    a.cornerAccent === b.cornerAccent &&
+    a.layout === b.layout &&
+    a.contentType === b.contentType &&
+    a.headlineSize === b.headlineSize &&
+    a.bodyWeight === b.bodyWeight &&
+    a.textAlign === b.textAlign
   );
 }
 
@@ -73,6 +83,11 @@ const FIELD_LABELS: Record<string, string> = {
   source: "source tag",
   division: "division",
   accent: "corner accent",
+  layout: "layout",
+  contentType: "content type",
+  headlineSize: "headline size",
+  bodyWeight: "body weight",
+  textAlign: "text align",
 };
 
 export default function StoryEditor({ story, date, onClose, onSaved }: Props) {

@@ -1,4 +1,4 @@
-import { Story } from "@/types";
+import { Story, Layout, ContentType, HeadlineSize, BodyWeight, TextAlign } from "@/types";
 
 function extractField(block: string, key: string): string {
   const re = new RegExp(`\\*\\*${key}:\\*\\*[ \\t]*(.+)`, "i");
@@ -6,8 +6,33 @@ function extractField(block: string, key: string): string {
   return m ? m[1].trim() : "";
 }
 
+function parseLayout(val: string): Layout {
+  const v = val.toLowerCase();
+  if (v === "center" || v === "bottom") return v;
+  return "top";
+}
+
+function parseContentType(val: string): ContentType {
+  const v = val.toLowerCase();
+  if (v === "bullets" || v === "quote") return v;
+  return "text";
+}
+
+function parseHeadlineSize(val: string): HeadlineSize {
+  const v = val.toLowerCase();
+  if (v === "large" || v === "compact") return v;
+  return "default";
+}
+
+function parseBodyWeight(val: string): BodyWeight {
+  return val.toLowerCase() === "semibold" ? "semibold" : "regular";
+}
+
+function parseTextAlign(val: string): TextAlign {
+  return val.toLowerCase() === "justify" ? "justify" : "left";
+}
+
 export function parseStories(markdown: string): Story[] {
-  // Try JSON block format first (future Sofia output)
   const stories: Story[] = [];
 
   // Split on story section separators (--- lines)
@@ -30,7 +55,11 @@ export function parseStories(markdown: string): Story[] {
           title,
           division: data.division ?? "Analysis",
           accentColor: data.accentColor ?? "#fe6203",
-          layoutTemplate: data.layoutTemplate ?? "headline-top-body-source",
+          layout: parseLayout(data.layout ?? data.layoutTemplate ?? ""),
+          contentType: parseContentType(data.contentType ?? ""),
+          headlineSize: parseHeadlineSize(data.headlineSize ?? ""),
+          bodyWeight: parseBodyWeight(data.bodyWeight ?? ""),
+          textAlign: parseTextAlign(data.textAlign ?? ""),
           headline: data.headline ?? "",
           body: data.body ?? "",
           sourceTag: data.sourceTag ?? "",
@@ -42,13 +71,17 @@ export function parseStories(markdown: string): Story[] {
       }
     }
 
-    // Regex parser for current Sofia output format
+    // Regex parser — new fields fall back to defaults when missing (backward compat)
     stories.push({
       index,
       title,
       division: extractField(section, "Division") || "Analysis",
       accentColor: extractField(section, "Accent color") || "#fe6203",
-      layoutTemplate: extractField(section, "Layout") || "headline-top-body-source",
+      layout: parseLayout(extractField(section, "Layout")),
+      contentType: parseContentType(extractField(section, "Content type")),
+      headlineSize: parseHeadlineSize(extractField(section, "Headline size")),
+      bodyWeight: parseBodyWeight(extractField(section, "Body weight")),
+      textAlign: parseTextAlign(extractField(section, "Text align")),
       headline: extractField(section, "Headline"),
       body: extractField(section, "Body"),
       sourceTag: extractField(section, "Source tag"),

@@ -7,7 +7,11 @@ export function serializeStory(story: Story): string {
 
 **Division:** ${story.division}
 **Accent color:** ${story.accentColor}
-**Layout:** ${story.layoutTemplate}
+**Layout:** ${story.layout}
+**Content type:** ${story.contentType}
+**Headline size:** ${story.headlineSize}
+**Body weight:** ${story.bodyWeight}
+**Text align:** ${story.textAlign}
 
 **Headline:** ${story.headline}
 **Body:** ${story.body}

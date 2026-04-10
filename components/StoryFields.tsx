@@ -4,6 +4,32 @@ import { Story } from "@/types";
 import { checkCompliance } from "@/lib/compliance";
 
 const DIVISIONS = ["Analysis", "Projects", "Culture"] as const;
+const LAYOUTS = [
+  { value: "top", label: "Top" },
+  { value: "center", label: "Center" },
+  { value: "bottom", label: "Bottom" },
+] as const;
+const CONTENT_TYPES = [
+  { value: "text", label: "Text" },
+  { value: "bullets", label: "Bullets" },
+  { value: "quote", label: "Quote" },
+] as const;
+const HEADLINE_SIZES = [
+  { value: "large", label: "Large" },
+  { value: "default", label: "Default" },
+  { value: "compact", label: "Compact" },
+] as const;
+const BODY_WEIGHTS = [
+  { value: "regular", label: "Regular" },
+  { value: "semibold", label: "Semi-bold" },
+] as const;
+const TEXT_ALIGNS = [
+  { value: "left", label: "Left" },
+  { value: "justify", label: "Justify" },
+] as const;
+
+const selectClass =
+  "bg-border border border-[#2a2a2a] rounded-[5px] px-3 py-2.5 text-brand-white text-sm outline-none w-full disabled:opacity-50";
 
 interface Props {
   draft: Story;
@@ -54,7 +80,7 @@ export default function StoryFields({ draft, onUpdate, disabled }: Props) {
             value={draft.division}
             onChange={(e) => onUpdate("division", e.target.value)}
             disabled={disabled}
-            className="bg-border border border-[#2a2a2a] rounded-[5px] px-3 py-2.5 text-brand-white text-sm outline-none w-full disabled:opacity-50"
+            className={selectClass}
           >
             {DIVISIONS.map((d) => (
               <option key={d} value={d}>
@@ -69,7 +95,7 @@ export default function StoryFields({ draft, onUpdate, disabled }: Props) {
             value={draft.cornerAccent}
             onChange={(e) => onUpdate("cornerAccent", e.target.value as ">" | "+")}
             disabled={disabled}
-            className="bg-border border border-[#2a2a2a] rounded-[5px] px-3 py-2.5 text-brand-white text-sm outline-none w-full disabled:opacity-50"
+            className={selectClass}
           >
             <option value=">">&rsaquo; Chevron</option>
             <option value="+">+ Plus</option>
@@ -82,6 +108,75 @@ export default function StoryFields({ draft, onUpdate, disabled }: Props) {
           {compliance.colorValid.detail}
         </p>
       )}
+
+      <div className="flex gap-4">
+        <Field label="LAYOUT" className="flex-1">
+          <select
+            value={draft.layout}
+            onChange={(e) => onUpdate("layout", e.target.value)}
+            disabled={disabled}
+            className={selectClass}
+          >
+            {LAYOUTS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label="CONTENT TYPE" className="flex-1">
+          <select
+            value={draft.contentType}
+            onChange={(e) => onUpdate("contentType", e.target.value)}
+            disabled={disabled}
+            className={selectClass}
+          >
+            {CONTENT_TYPES.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </Field>
+      </div>
+
+      <div className="flex gap-4">
+        <Field label="HEADLINE SIZE" className="flex-1">
+          <select
+            value={draft.headlineSize}
+            onChange={(e) => onUpdate("headlineSize", e.target.value)}
+            disabled={disabled}
+            className={selectClass}
+          >
+            {HEADLINE_SIZES.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label="BODY WEIGHT" className="flex-1">
+          <select
+            value={draft.bodyWeight}
+            onChange={(e) => onUpdate("bodyWeight", e.target.value)}
+            disabled={disabled}
+            className={selectClass}
+          >
+            {BODY_WEIGHTS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label="TEXT ALIGN" className="flex-1">
+          <select
+            value={draft.textAlign}
+            onChange={(e) => onUpdate("textAlign", e.target.value)}
+            disabled={disabled}
+            className={selectClass}
+          >
+            {TEXT_ALIGNS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </Field>
+      </div>
     </>
   );
 }

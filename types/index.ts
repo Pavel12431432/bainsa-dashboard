@@ -1,9 +1,19 @@
+export type Layout = "top" | "center" | "bottom";
+export type ContentType = "text" | "bullets" | "quote";
+export type HeadlineSize = "large" | "default" | "compact";
+export type BodyWeight = "regular" | "semibold";
+export type TextAlign = "left" | "justify";
+
 export interface Story {
   index: number;           // 1-based
   title: string;           // from "## Story N: Title"
   division: "Analysis" | "Projects" | "Culture" | string;
   accentColor: string;     // hex e.g. "#fe6203"
-  layoutTemplate: string;
+  layout: Layout;
+  contentType: ContentType;
+  headlineSize: HeadlineSize;
+  bodyWeight: BodyWeight;
+  textAlign: TextAlign;
   headline: string;
   body: string;
   sourceTag: string;
