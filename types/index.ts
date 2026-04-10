@@ -3,6 +3,9 @@ export type ContentType = "text" | "bullets" | "quote";
 export type HeadlineSize = "large" | "default" | "compact";
 export type BodyWeight = "regular" | "semibold";
 export type TextAlign = "left" | "justify";
+export type CornerSize = "small" | "medium";
+export type AccentBar = "bottom" | "top" | "none";
+export type GhostAccent = "none" | "bottom-right" | "center" | "top-left";
 
 export interface Story {
   index: number;           // 1-based
@@ -14,6 +17,9 @@ export interface Story {
   headlineSize: HeadlineSize;
   bodyWeight: BodyWeight;
   textAlign: TextAlign;
+  cornerSize: CornerSize;
+  accentBar: AccentBar;
+  ghostAccent: GhostAccent;
   headline: string;
   body: string;
   sourceTag: string;

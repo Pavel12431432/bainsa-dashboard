@@ -12,6 +12,9 @@ export function serializeStory(story: Story): string {
 **Headline size:** ${story.headlineSize}
 **Body weight:** ${story.bodyWeight}
 **Text align:** ${story.textAlign}
+**Corner size:** ${story.cornerSize}
+**Accent bar:** ${story.accentBar}
+**Ghost accent:** ${story.ghostAccent}
 
 **Headline:** ${story.headline}
 **Body:** ${story.body}

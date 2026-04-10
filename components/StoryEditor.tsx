@@ -46,48 +46,36 @@ function applyUpdates(prev: Story, updates: Partial<Story>): Story {
   return next;
 }
 
+/** Compare two stories and return the keys that differ (excluding index/title) */
+const COMPARABLE_KEYS = [
+  "headline", "body", "sourceTag", "division", "accentColor",
+  "cornerAccent", "layout", "contentType", "headlineSize",
+  "bodyWeight", "textAlign", "cornerSize", "accentBar", "ghostAccent",
+] as const satisfies readonly (keyof Story)[];
+
 function diffFields(a: Story, b: Story): string[] {
-  const fields: string[] = [];
-  if (a.headline !== b.headline) fields.push("headline");
-  if (a.body !== b.body) fields.push("body");
-  if (a.sourceTag !== b.sourceTag) fields.push("source");
-  if (a.division !== b.division) fields.push("division");
-  if (a.cornerAccent !== b.cornerAccent) fields.push("accent");
-  if (a.layout !== b.layout) fields.push("layout");
-  if (a.contentType !== b.contentType) fields.push("contentType");
-  if (a.headlineSize !== b.headlineSize) fields.push("headlineSize");
-  if (a.bodyWeight !== b.bodyWeight) fields.push("bodyWeight");
-  if (a.textAlign !== b.textAlign) fields.push("textAlign");
-  return fields;
+  return COMPARABLE_KEYS.filter((k) => a[k] !== b[k]);
 }
 
 function storyEqual(a: Story, b: Story): boolean {
-  return (
-    a.headline === b.headline &&
-    a.body === b.body &&
-    a.sourceTag === b.sourceTag &&
-    a.division === b.division &&
-    a.accentColor === b.accentColor &&
-    a.cornerAccent === b.cornerAccent &&
-    a.layout === b.layout &&
-    a.contentType === b.contentType &&
-    a.headlineSize === b.headlineSize &&
-    a.bodyWeight === b.bodyWeight &&
-    a.textAlign === b.textAlign
-  );
+  return COMPARABLE_KEYS.every((k) => a[k] === b[k]);
 }
 
 const FIELD_LABELS: Record<string, string> = {
   headline: "headline",
   body: "body",
-  source: "source tag",
+  sourceTag: "source tag",
   division: "division",
-  accent: "corner accent",
+  accentColor: "accent color",
+  cornerAccent: "corner accent",
   layout: "layout",
   contentType: "content type",
   headlineSize: "headline size",
   bodyWeight: "body weight",
   textAlign: "text align",
+  cornerSize: "corner size",
+  accentBar: "accent bar",
+  ghostAccent: "ghost accent",
 };
 
 export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
@@ -379,9 +367,8 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
               </div>
               <div className="flex flex-col gap-1.5">
                 {pending.changedFields.map((f) => {
-                  const key = f === "source" ? "sourceTag" : f === "accent" ? "cornerAccent" : f;
-                  const old = (pending.before as unknown as Record<string, string>)[key] ?? "";
-                  const now = (pending.after as unknown as Record<string, string>)[key] ?? "";
+                  const old = (pending.before as unknown as Record<string, string>)[f] ?? "";
+                  const now = (pending.after as unknown as Record<string, string>)[f] ?? "";
                   return (
                     <div key={f} className="text-[0.65rem] leading-relaxed">
                       <span className="text-muted font-semibold uppercase tracking-[0.04em]">{FIELD_LABELS[f] ?? f}: </span>

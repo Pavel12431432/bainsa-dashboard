@@ -42,7 +42,6 @@
 
   /* Spacing inside card */
   --card-pad: 28px;
-  --accent-border: 3px;
 }
 
 @theme inline {

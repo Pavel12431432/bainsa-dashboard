@@ -1,4 +1,4 @@
-import { Story, Layout, ContentType, HeadlineSize, BodyWeight, TextAlign } from "@/types";
+import { Story, Layout, ContentType, HeadlineSize, BodyWeight, TextAlign, CornerSize, AccentBar, GhostAccent } from "@/types";
 
 function extractField(block: string, key: string): string {
   const re = new RegExp(`\\*\\*${key}:\\*\\*[ \\t]*(.+)`, "i");
@@ -32,6 +32,22 @@ function parseTextAlign(val: string): TextAlign {
   return val.toLowerCase() === "justify" ? "justify" : "left";
 }
 
+function parseCornerSize(val: string): CornerSize {
+  return val.toLowerCase() === "medium" ? "medium" : "small";
+}
+
+function parseAccentBar(val: string): AccentBar {
+  const v = val.toLowerCase();
+  if (v === "top" || v === "none") return v;
+  return "bottom";
+}
+
+function parseGhostAccent(val: string): GhostAccent {
+  const v = val.toLowerCase().replace(/\s+/g, "-");
+  if (v === "bottom-right" || v === "center" || v === "top-left") return v;
+  return "none";
+}
+
 export function parseStories(markdown: string): Story[] {
   const stories: Story[] = [];
 
@@ -60,6 +76,9 @@ export function parseStories(markdown: string): Story[] {
           headlineSize: parseHeadlineSize(data.headlineSize ?? ""),
           bodyWeight: parseBodyWeight(data.bodyWeight ?? ""),
           textAlign: parseTextAlign(data.textAlign ?? ""),
+          cornerSize: parseCornerSize(data.cornerSize ?? ""),
+          accentBar: parseAccentBar(data.accentBar ?? ""),
+          ghostAccent: parseGhostAccent(data.ghostAccent ?? ""),
           headline: data.headline ?? "",
           body: data.body ?? "",
           sourceTag: data.sourceTag ?? "",
@@ -82,6 +101,9 @@ export function parseStories(markdown: string): Story[] {
       headlineSize: parseHeadlineSize(extractField(section, "Headline size")),
       bodyWeight: parseBodyWeight(extractField(section, "Body weight")),
       textAlign: parseTextAlign(extractField(section, "Text align")),
+      cornerSize: parseCornerSize(extractField(section, "Corner size")),
+      accentBar: parseAccentBar(extractField(section, "Accent bar")),
+      ghostAccent: parseGhostAccent(extractField(section, "Ghost accent")),
       headline: extractField(section, "Headline"),
       body: extractField(section, "Body"),
       sourceTag: extractField(section, "Source tag"),

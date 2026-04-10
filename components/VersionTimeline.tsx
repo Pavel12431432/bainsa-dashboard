@@ -25,7 +25,7 @@ export default function VersionTimeline({ entries, viewingIdx, onSelect, onResto
   if (entries.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-2 border border-border-mid rounded-lg overflow-hidden">
+    <div className="flex flex-col border border-border-mid rounded-lg">
       {/* Viewing banner */}
       {viewingIdx !== null && (
         <div className="flex items-center justify-between gap-3 px-3.5 py-2 bg-border-light">

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Story } from "@/types";
 import { checkCompliance } from "@/lib/compliance";
 
@@ -27,6 +28,21 @@ const TEXT_ALIGNS = [
   { value: "left", label: "Left" },
   { value: "justify", label: "Justify" },
 ] as const;
+const CORNER_SIZES = [
+  { value: "small", label: "Small" },
+  { value: "medium", label: "Medium" },
+] as const;
+const ACCENT_BARS = [
+  { value: "bottom", label: "Bottom" },
+  { value: "top", label: "Top" },
+  { value: "none", label: "None" },
+] as const;
+const GHOST_ACCENTS = [
+  { value: "none", label: "None" },
+  { value: "bottom-right", label: "Bottom-right" },
+  { value: "center", label: "Center" },
+  { value: "top-left", label: "Top-left" },
+] as const;
 
 const selectClass =
   "bg-border border border-[#2a2a2a] rounded-[5px] px-3 py-2.5 text-brand-white text-sm outline-none w-full disabled:opacity-50";
@@ -39,6 +55,7 @@ interface Props {
 
 export default function StoryFields({ draft, onUpdate, disabled }: Props) {
   const compliance = checkCompliance(draft);
+  const [showStyle, setShowStyle] = useState(false);
 
   return (
     <>
@@ -109,74 +126,73 @@ export default function StoryFields({ draft, onUpdate, disabled }: Props) {
         </p>
       )}
 
-      <div className="flex gap-4">
-        <Field label="LAYOUT" className="flex-1">
-          <select
-            value={draft.layout}
-            onChange={(e) => onUpdate("layout", e.target.value)}
-            disabled={disabled}
-            className={selectClass}
-          >
-            {LAYOUTS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        </Field>
+      {/* Collapsible style options */}
+      <button
+        type="button"
+        onClick={() => setShowStyle((v) => !v)}
+        className="flex items-center gap-2 text-[0.65rem] font-semibold text-muted tracking-[0.08em] bg-transparent border-none cursor-pointer hover:text-brand-white py-1 -mb-2"
+      >
+        <svg
+          width="8" height="8" viewBox="0 0 8 8" fill="currentColor"
+          className={`transition-transform duration-150 ${showStyle ? "rotate-90" : ""}`}
+        >
+          <path d="M2 1L6 4L2 7Z" />
+        </svg>
+        STYLE OPTIONS
+      </button>
 
-        <Field label="CONTENT TYPE" className="flex-1">
-          <select
-            value={draft.contentType}
-            onChange={(e) => onUpdate("contentType", e.target.value)}
-            disabled={disabled}
-            className={selectClass}
-          >
-            {CONTENT_TYPES.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        </Field>
-      </div>
+      {showStyle && (
+        <div className="flex flex-col gap-4">
+          <div className="flex gap-4">
+            <Field label="LAYOUT" className="flex-1">
+              <select value={draft.layout} onChange={(e) => onUpdate("layout", e.target.value)} disabled={disabled} className={selectClass}>
+                {LAYOUTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </Field>
+            <Field label="CONTENT TYPE" className="flex-1">
+              <select value={draft.contentType} onChange={(e) => onUpdate("contentType", e.target.value)} disabled={disabled} className={selectClass}>
+                {CONTENT_TYPES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </Field>
+          </div>
 
-      <div className="flex gap-4">
-        <Field label="HEADLINE SIZE" className="flex-1">
-          <select
-            value={draft.headlineSize}
-            onChange={(e) => onUpdate("headlineSize", e.target.value)}
-            disabled={disabled}
-            className={selectClass}
-          >
-            {HEADLINE_SIZES.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        </Field>
+          <div className="flex gap-4">
+            <Field label="HEADLINE SIZE" className="flex-1">
+              <select value={draft.headlineSize} onChange={(e) => onUpdate("headlineSize", e.target.value)} disabled={disabled} className={selectClass}>
+                {HEADLINE_SIZES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </Field>
+            <Field label="BODY WEIGHT" className="flex-1">
+              <select value={draft.bodyWeight} onChange={(e) => onUpdate("bodyWeight", e.target.value)} disabled={disabled} className={selectClass}>
+                {BODY_WEIGHTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </Field>
+            <Field label="TEXT ALIGN" className="flex-1">
+              <select value={draft.textAlign} onChange={(e) => onUpdate("textAlign", e.target.value)} disabled={disabled} className={selectClass}>
+                {TEXT_ALIGNS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </Field>
+          </div>
 
-        <Field label="BODY WEIGHT" className="flex-1">
-          <select
-            value={draft.bodyWeight}
-            onChange={(e) => onUpdate("bodyWeight", e.target.value)}
-            disabled={disabled}
-            className={selectClass}
-          >
-            {BODY_WEIGHTS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="TEXT ALIGN" className="flex-1">
-          <select
-            value={draft.textAlign}
-            onChange={(e) => onUpdate("textAlign", e.target.value)}
-            disabled={disabled}
-            className={selectClass}
-          >
-            {TEXT_ALIGNS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        </Field>
-      </div>
+          <div className="flex gap-4">
+            <Field label="CORNER SIZE" className="flex-1">
+              <select value={draft.cornerSize} onChange={(e) => onUpdate("cornerSize", e.target.value)} disabled={disabled} className={selectClass}>
+                {CORNER_SIZES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </Field>
+            <Field label="ACCENT BAR" className="flex-1">
+              <select value={draft.accentBar} onChange={(e) => onUpdate("accentBar", e.target.value)} disabled={disabled} className={selectClass}>
+                {ACCENT_BARS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </Field>
+            <Field label="GHOST ACCENT" className="flex-1">
+              <select value={draft.ghostAccent} onChange={(e) => onUpdate("ghostAccent", e.target.value)} disabled={disabled} className={selectClass}>
+                {GHOST_ACCENTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </Field>
+          </div>
+        </div>
+      )}
     </>
   );
 }

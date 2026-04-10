@@ -6,12 +6,15 @@ export type AgentId = keyof typeof AGENT_CLI_NAMES;
 
 export function buildUserMessage(story: Story, instruction: string): string {
   return `You are editing a BAINSA Instagram story card. Constraints: headline max 80 chars, body max 240 chars.
-Available JSON fields: headline, body, sourceTag, division, cornerAccent, layout, contentType, headlineSize, bodyWeight, textAlign.
+Available JSON fields: headline, body, sourceTag, division, cornerAccent, layout, contentType, headlineSize, bodyWeight, textAlign, cornerSize, accentBar, ghostAccent.
 - layout: "top" | "center" | "bottom"
 - contentType: "text" | "bullets" | "quote"
 - headlineSize: "large" | "default" | "compact"
 - bodyWeight: "regular" | "semibold"
 - textAlign: "left" | "justify"
+- cornerSize: "small" | "medium"
+- accentBar: "bottom" | "top" | "none"
+- ghostAccent: "none" | "bottom-right" | "center" | "top-left"
 
 When modifying the story, respond with a brief explanation then a JSON code block with ONLY changed fields. If no changes needed, just respond conversationally.
 
@@ -26,6 +29,9 @@ Content type: ${story.contentType}
 Headline size: ${story.headlineSize}
 Body weight: ${story.bodyWeight}
 Text align: ${story.textAlign}
+Corner size: ${story.cornerSize}
+Accent bar: ${story.accentBar}
+Ghost accent: ${story.ghostAccent}
 
 User: ${instruction}`;
 }

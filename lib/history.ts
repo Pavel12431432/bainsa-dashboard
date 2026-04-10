@@ -5,6 +5,23 @@ import { requireEnv } from "@/lib/env";
 
 const MAX_ENTRIES = 50;
 
+/** Defaults for fields added after existing history was written.
+ *  Update this object when adding new Story fields. */
+const STORY_DEFAULTS: Partial<Story> = {
+  layout: "top",
+  contentType: "text",
+  headlineSize: "default",
+  bodyWeight: "regular",
+  textAlign: "left",
+  cornerSize: "small",
+  accentBar: "bottom",
+  ghostAccent: "none",
+};
+
+function migrateStory(s: Story): Story {
+  return { ...STORY_DEFAULTS, ...s };
+}
+
 function historyPath(date: string): string {
   return `${requireEnv("STORIES_PATH")}/${date}.history.json`;
 }
@@ -21,7 +38,8 @@ async function readAllHistory(date: string): Promise<Record<string, HistoryEntry
 
 export async function readHistory(date: string, index: number): Promise<HistoryEntry[]> {
   const all = await readAllHistory(date);
-  return all[String(index)] ?? [];
+  const entries = all[String(index)] ?? [];
+  return entries.map((e) => ({ ...e, story: migrateStory(e.story) }));
 }
 
 export async function addHistory(
