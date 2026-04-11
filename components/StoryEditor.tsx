@@ -65,11 +65,27 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
   // Used for the "Original" history entry — must not be saved.current, which
   // saveStory mutates before recordHistory runs.
   const originalStory = useRef<Story>({ ...story });
-
   const hasDirtyManualEdits = !pending && viewingIdx === null && !storyEqual(draft, saved.current);
   const isViewingHistory = viewingIdx !== null;
 
+  const prevStoryRef = useRef<Story>(story);
   const historyUrl = `/api/stories/${date}/${story.index}/history`;
+
+  // Detect external story changes (e.g., Sofia background auto-save updated the grid)
+  useEffect(() => {
+    if (storyEqual(story, prevStoryRef.current)) return;
+    const before = { ...prevStoryRef.current };
+    prevStoryRef.current = story;
+    // If user has manual edits or is viewing history, don't overwrite
+    if (viewingIdx !== null) return;
+    const changedFields = diffFields(before, story);
+    if (changedFields.length === 0) return;
+    setPending({ before, after: story, changedFields });
+    setDraft({ ...story });
+    saved.current = { ...story };
+    // Refresh history (auto-save path already recorded it)
+    fetch(historyUrl).then(r => r.json()).then(setHistory).catch(() => {});
+  }, [story, viewingIdx, historyUrl]);
 
   useEffect(() => {
     setSessionId(getSessionId(date, story.index));
@@ -119,29 +135,28 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
     });
   }
 
-  function handleChatUpdate(updates: Partial<Story>) {
+  async function handleChatUpdate(updates: Partial<Story>) {
     const before = { ...draft };
     const after = applyUpdates(before, updates);
     const changedFields = diffFields(before, after);
     if (changedFields.length === 0) return;
     setPending({ before, after, changedFields });
     setDraft(after);
-  }
-
-  async function handleAccept() {
-    if (!pending) return;
-    const accepted = { ...draft };
-    const changedLabel = pending.changedFields.map((f) => FIELD_LABELS[f] ?? f).join(", ");
-    setPending(null);
-    if (await saveStory(accepted)) {
-      await recordHistory(accepted, `Sofia: ${changedLabel}`);
+    // Auto-save immediately
+    const changedLabel = changedFields.map((f) => FIELD_LABELS[f] ?? f).join(", ");
+    if (await saveStory(after)) {
+      await recordHistory(after, `Sofia: ${changedLabel}`);
     }
   }
 
-  function handleRevert() {
+  async function handleRevert() {
     if (!pending) return;
-    setDraft(pending.before);
+    const reverted = pending.before;
     setPending(null);
+    setDraft(reverted);
+    if (await saveStory(reverted)) {
+      await recordHistory(reverted, "Reverted Sofia edit");
+    }
   }
 
   function handleReset() {
@@ -310,14 +325,14 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
                 </p>
                 <div className="flex gap-2 shrink-0">
                   <button
-                    onClick={handleAccept}
-                    className="text-[0.65rem] font-semibold text-success bg-transparent border border-success/30 rounded px-2.5 py-1 cursor-pointer hover:bg-success/10"
+                    onClick={() => setPending(null)}
+                    className="text-[0.65rem] font-semibold text-muted bg-transparent border border-border-mid rounded px-2.5 py-1 cursor-pointer hover:text-brand-white"
                   >
-                    ACCEPT
+                    OK
                   </button>
                   <button
                     onClick={handleRevert}
-                    className="text-[0.65rem] font-semibold text-muted bg-transparent border border-border-mid rounded px-2.5 py-1 cursor-pointer hover:text-brand-white"
+                    className="text-[0.65rem] font-semibold text-muted bg-transparent border border-border-mid rounded px-2.5 py-1 cursor-pointer hover:text-danger hover:border-danger/30"
                   >
                     REVERT
                   </button>

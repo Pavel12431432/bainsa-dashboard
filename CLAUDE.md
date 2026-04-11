@@ -1,6 +1,6 @@
 # BAINSA Dashboard — Codebase Reference
 
-Read this file instead of exploring the codebase. It is complete and up-to-date as of 2026-04-03.
+Read this file instead of exploring the codebase. It is complete and up-to-date as of 2026-04-11.
 
 ## What this is
 
@@ -258,13 +258,13 @@ interface ChatMessage {
 | `SlidePanel.tsx` | Shared slide-out panel: `side` (left/right), `width`, `title` (ReactNode), `onClose`. 220ms translateX animation. |
 | `HamburgerMenu.tsx` | Left slide-out: search bar (debounced, results as links with `?highlight`), agent output triggers, logout. |
 | `AgentChat.tsx` | Right slide-out chat with Marco/Sofia. Agent tabs for switching. Collapsible+draggable output block, message list (localStorage persisted), text input. Derives `isLoading` from parent's `agentLoading[agent]` (not local state) so thinking indicator persists across drawer open/close. Captures `agent`, `sessionId`, and `date` in `send()` closure so requests complete even if drawer closes mid-flight. Prepends `[Viewing stories for DATE]` to messages so agents know which date is active. |
-| `StoryGrid.tsx` | 4-col grid (responsive). Approve/reject/edit buttons per card — hover overlay on desktop, separate row below card on mobile. Approved cards get green outer glow, rejected get red glow + dark overlay. Compliance badges on failing cards with hover tooltips (card column gets `z-10` on badge hover to prevent clipping). Stale stories banner when Marco ran after Sofia. Export button at bottom (shows approved count if any). Listens for `stories-changed` CustomEvent to refetch. Subscribes to `storyChatTracker` for Sofia loading spinner and "Sofia updated" pill on cards. Division filter pills. |
+| `StoryGrid.tsx` | 4-col grid (responsive). Approve/reject/edit buttons per card — hover overlay on desktop, separate row below card on mobile. Approved cards get green outer glow, rejected get red glow + dark overlay. Compliance badges on failing cards with hover tooltips (card column gets `z-10` on badge hover to prevent clipping). Stale stories banner when Marco ran after Sofia. Export button at bottom (shows approved count if any). Listens for `stories-changed` CustomEvent to refetch. Uses `useSyncExternalStore` with `storyChatTracker` for Sofia loading spinner and "Sofia updated" pill on cards. Updates `editing` state when stories refresh so the open editor receives background changes. Uses `storiesRef` for stable `refreshStories` callback identity. Division filter pills. |
 | `StoryCard.tsx` | Card shell: fixed scale (editor) or auto-scale via `useLayoutEffect` + `ResizeObserver` (grid). |
 | `StoryContent.tsx` | Inner 9:16 story design: accent border, BAINSA logo, chevron/plus SVG, headline (Alliance No.2), body, source. |
-| `StoryEditor.tsx` | Edit modal. Desktop: preview + form + chat (3 cols). Preview has CARD/PHONE toggle (persisted to localStorage) and fullscreen expand button. Mobile: FIELDS/SOFIA tabs. Accept/revert for Sofia suggestions with inline diff (strikethrough old, green new). Version history with restore. |
+| `StoryEditor.tsx` | Edit modal. Desktop: preview + form + chat (3 cols). Preview has CARD/PHONE toggle (persisted to localStorage) and fullscreen expand button. Mobile: FIELDS/SOFIA tabs. Sofia suggestions auto-save immediately; OK dismisses the diff banner, REVERT undoes and saves (red hover accent). Detects external story prop changes (background Sofia auto-save) and shows the same diff banner. Inline diff shows strikethrough old + green new. Version history with restore. |
 | `PhonePreview.tsx` | Instagram phone preview: frameless rounded screen (405x880) with story content (via `StoryContent`) overlaid by real iOS chrome images (`ig-chrome-top.png`, `ig-chrome-bottom.png`), progress bar, and BAINSA profile row. Accepts `story` and optional `scale` prop. |
 | `StoryFields.tsx` | Form fields with inline compliance warnings. Headline/body have char counters. Color mismatch warning shown below division row. Source tag shows warning when empty. Runs `checkCompliance()` on every render. |
-| `StoryChat.tsx` | Chat panel for inline Sofia editing in story editor. Messages persisted to localStorage. Uses `mountedRef` to detect unmount — if editor closes mid-request, auto-saves updates via API and shows "Sofia updated" pill on the grid card. Uses `storyChatTracker` for loading state that survives unmount. |
+| `StoryChat.tsx` | Chat panel for inline Sofia editing in story editor. Messages persisted to localStorage. Uses `mountedRef` to detect unmount — if editor closes mid-request, auto-saves updates via API and shows "Sofia updated" pill on the grid card. Subscribes to `storyChatTracker` for loading state that survives unmount; reloads messages from localStorage when a background request finishes so the reply appears if the editor was re-opened. |
 | `VersionTimeline.tsx` | Scrollable version history with dot indicators, time-ago labels, restore/back. Hides RESTORE button on the latest (current) entry. |
 | `DateNav.tsx` | Date navigation with `<Link prefetch>`. Calendar picker that grays out dates with no stories (fetches from `/api/story-dates`). |
 | `ComplianceBadge.tsx` | Card overlay showing failing compliance checks as red chips. Hover shows detail tooltip (centered, z-50). Badge tints red on hover for feedback. |
@@ -274,7 +274,7 @@ interface ChatMessage {
 
 | File | Purpose |
 |---|---|
-| `parseStories.ts` | Parses Sofia's markdown to `Story[]`. Regex `extractField()` uses `[ \t]*` (not `\s*`) to avoid cross-newline matching on empty fields. JSON blocks first, regex fallback. |
+| `parseStories.ts` | Parses Sofia's markdown to `Story[]`. Regex `extractField()` uses `[ \t]*` (not `\s*`) to avoid cross-newline matching on empty fields. `extractBody()` handles multiline bullet bodies (continuation lines starting with `>`). JSON blocks first, regex fallback. |
 | `serializeStories.ts` | `Story` to markdown (no colon/title in `## Story N` header). `replaceStory()` for in-place updates — regex matches `## Story \d+` (no colon). |
 | `compliance.ts` | `checkCompliance(story)` -> `ComplianceResult`. Each check returns `{ pass, detail }`. Checks: color matches division canonical, headline 0-80 chars, body 0-max chars (content-type-aware: text=300, bullets=200, quote=200), source non-empty. Exports `bodyMaxChars(contentType)`. |
 | `exportCards.ts` | PNG export: renders `StoryContent` offscreen via `createRoot`, captures with html2canvas-pro at 4x scale, downloads individually or as ZIP. |
@@ -285,7 +285,7 @@ interface ChatMessage {
 | `fetch.ts` | Shared `apiFetch(url, body)` with `Content-Type` + `X-Requested-With: fetch` headers. |
 | `history.ts` | Read/write version history sidecars. Capped at 50 entries per story. |
 | `storyUtils.ts` | Shared story helpers: `applyUpdates()`, `diffFields()`, `storyEqual()`, `COMPARABLE_KEYS`, `FIELD_LABELS`. Used by StoryEditor, StoryChat, and StoryGrid. |
-| `storyChatTracker.ts` | Module-level (outside React) tracker for in-flight story chat requests. Tracks loading state and "updated but unseen" state (persisted to localStorage). Subscribe mechanism for React components. |
+| `storyChatTracker.ts` | Module-level (outside React) tracker for in-flight story chat requests. Tracks loading state and "updated but unseen" state (persisted to localStorage). Subscribe mechanism + `getSnapshot()` for `useSyncExternalStore` in React components. |
 | `chat.ts` | Shared chat helpers: `autoResize()`, `handleChatKeyDown()`, `loadMessages()`, `saveMessages()`, and localStorage key helpers (`storyChatKey`, `storyChatSessionKey`, `agentChatKey`, `agentChatSessionKey`). |
 | `markdown.tsx` | Shared `renderMarkdown()` + `linkSources()` for agent output rendering. Handles headings, bold, links, source+link merging. |
 | `fs.ts` | `fileExists()` utility. |
@@ -353,16 +353,20 @@ All mutation endpoints require `X-Requested-With: fetch` header (CSRF prevention
 
 **StoryChat** (editor) requests continue even when the editor modal is closed:
 - `send()` captures all values in closures; `mountedRef` tracks whether the component is still alive
-- If mounted when response arrives: normal flow (show message, trigger accept/revert via `onUpdate`)
+- If mounted when response arrives: normal flow (show message, trigger OK/revert via `onUpdate`)
 - If unmounted: auto-saves updates directly via the update API, marks story as updated in `storyChatTracker`, dispatches `stories-changed`
 - `storyChatTracker` (module-level, outside React) tracks loading and "updated but unseen" state
-- StoryGrid subscribes to the tracker: shows spinner while Sofia is thinking, green "Sofia updated" pill (3s fade) when she finishes
+- StoryGrid subscribes via `useSyncExternalStore`: shows spinner while Sofia is thinking, green "Sofia updated" pill (3s fade) when she finishes
+- When `stories-changed` fires, StoryGrid updates both `stories` and `editing` state so the open editor receives the new story via prop
+- StoryEditor detects external story prop changes and shows the pending diff banner (OK/REVERT)
+- StoryChat subscribes to tracker and reloads messages from localStorage when loading clears, so Sofia's reply appears if the editor was re-opened mid-request
 - Opening the editor clears the "unseen" flag
 
 ## Cross-component communication
 
 - **`stories-changed` CustomEvent**: Dispatched by AgentChat and StoryChat (on background auto-save) after any agent reply. StoryGrid listens and refetches stories + stale status.
-- **`storyChatTracker` subscription**: StoryGrid subscribes to loading/updated state changes for showing per-card Sofia indicators.
+- **`storyChatTracker` + `useSyncExternalStore`**: StoryGrid subscribes to loading/updated state changes for showing per-card Sofia indicators. StoryChat subscribes to reload messages when background requests finish.
+- **`editing` state update**: StoryGrid updates `editing` when stories refresh, so StoryEditor receives background changes via prop. StoryEditor detects prop changes and shows the diff banner.
 - **`onSaved` callback**: StoryEditor calls this to update StoryGrid's in-memory stories after a save.
 - **`onLoadingChange` callback**: AgentChat notifies HeaderShell when requests start/end.
 

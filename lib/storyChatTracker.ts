@@ -5,6 +5,7 @@
 
 const loading = new Set<string>();
 const listeners = new Set<() => void>();
+let version = 0;
 
 const UPDATED_STORAGE_KEY = "sofia-updated-stories";
 
@@ -13,7 +14,13 @@ function key(date: string, index: number) {
 }
 
 function notify() {
+  version++;
   listeners.forEach((fn) => fn());
+}
+
+/** Snapshot counter — changes on every loading/updated state change. */
+export function getSnapshot(): number {
+  return version;
 }
 
 // --- Loading state ---

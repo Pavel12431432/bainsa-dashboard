@@ -5,7 +5,7 @@ import { Story, ChatMessage } from "@/types";
 import { apiFetch } from "@/lib/fetch";
 import { applyUpdates } from "@/lib/storyUtils";
 import { autoResize, handleChatKeyDown, loadMessages, saveMessages, storyChatKey } from "@/lib/chat";
-import { markLoading, clearLoading, markUpdated, isStoryChatLoading } from "@/lib/storyChatTracker";
+import { markLoading, clearLoading, markUpdated, isStoryChatLoading, subscribe as subscribeChatTracker } from "@/lib/storyChatTracker";
 
 interface Props {
   story: Story;
@@ -36,6 +36,18 @@ export default function StoryChat({ story, date, sessionId, onUpdate, onReset, d
     setMessages(loadMessages(key));
     setLoading(isStoryChatLoading(date, story.index));
   }, [key, date, story.index]);
+
+  // Subscribe to tracker so loading clears if the old instance's request finishes
+  useEffect(() => {
+    return subscribeChatTracker(() => {
+      const nowLoading = isStoryChatLoading(date, story.index);
+      setLoading(nowLoading);
+      // When a background request finishes, reload messages (reply was saved to localStorage)
+      if (!nowLoading) {
+        setMessages(loadMessages(key));
+      }
+    });
+  }, [date, story.index, key]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -68,35 +80,36 @@ export default function StoryChat({ story, date, sessionId, onUpdate, onReset, d
       });
 
       if (!res.ok) {
-        const text = await res.text();
-        try { throw new Error(JSON.parse(text).error); } catch { throw new Error(`Server error (${res.status})`); }
+        const body = await res.text();
+        try { throw new Error(JSON.parse(body).error); } catch { throw new Error(`Server error (${res.status})`); }
       }
       const data = await res.json();
 
       const withReply = [...withUser, { role: "assistant" as const, content: data.reply }];
       saveMessages(currentKey, withReply);
+      // Always update state — React 19 silently ignores if unmounted
+      setMessages(withReply);
 
-      if (mountedRef.current) {
-        setMessages(withReply);
-        if (data.updates) onUpdate(data.updates);
-      } else if (data.updates) {
-        // Editor was closed — auto-save the updates directly
-        const updated = applyUpdates(currentStory, data.updates);
-        await apiFetch(`/api/stories/${currentDate}/${currentIndex}/update`, updated);
-        markUpdated(currentDate, currentIndex);
-        document.dispatchEvent(new CustomEvent("stories-changed"));
+      if (data.updates) {
+        if (mountedRef.current) {
+          onUpdate(data.updates);
+        } else {
+          // Editor was closed — auto-save the updates directly
+          const updated = applyUpdates(currentStory, data.updates);
+          await apiFetch(`/api/stories/${currentDate}/${currentIndex}/update`, updated);
+          markUpdated(currentDate, currentIndex);
+          document.dispatchEvent(new CustomEvent("stories-changed"));
+        }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Something went wrong";
       const withError = [...withUser, { role: "assistant" as const, content: `Error: ${msg}` }];
       saveMessages(currentKey, withError);
-      if (mountedRef.current) {
-        setMessages(withError);
-      }
+      setMessages(withError);
     } finally {
       clearLoading(currentDate, currentIndex);
+      setLoading(false);
       if (mountedRef.current) {
-        setLoading(false);
         inputRef.current?.focus();
       }
     }

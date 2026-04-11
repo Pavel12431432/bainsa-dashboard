@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from "react";
 import { Story, ApprovalState } from "@/types";
 import { apiFetch } from "@/lib/fetch";
 import { checkCompliance } from "@/lib/compliance";
 import { diffFields } from "@/lib/storyUtils";
-import { isStoryChatLoading, isUpdatedUnseen, clearUpdated, subscribe as subscribeChatTracker } from "@/lib/storyChatTracker";
+import { isStoryChatLoading, isUpdatedUnseen, clearUpdated, subscribe as subscribeChatTracker, getSnapshot as getChatTrackerSnapshot } from "@/lib/storyChatTracker";
 import StoryCard from "./StoryCard";
 import ComplianceBadge from "./ComplianceBadge";
 import StoryEditor from "./StoryEditor";
@@ -40,6 +40,8 @@ const DIVISION_COLORS: Record<Division, string> = {
 
 export default function StoryGrid({ date, initialStories, initialApprovals, highlightIndex }: Props) {
   const [stories, setStories] = useState<Story[]>(initialStories);
+  const storiesRef = useRef(stories);
+  storiesRef.current = stories;
   const [divisionFilter, setDivisionFilter] = useState<Division>("All");
   const highlightDone = useRef(false);
 
@@ -60,10 +62,9 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
   const [showExport, setShowExport] = useState(false);
   const [stale, setStale] = useState<string | null>(null); // Marco's lastRun if stale
   const [regenerating, setRegenerating] = useState(false);
-  const [, forceUpdate] = useState(0);
 
-  // Subscribe to story chat loading state changes
-  useEffect(() => subscribeChatTracker(() => forceUpdate((n) => n + 1)), []);
+  // Re-render when story chat loading/updated state changes
+  useSyncExternalStore(subscribeChatTracker, getChatTrackerSnapshot);
 
   // Check if stories are stale (Marco updated after Sofia)
   const checkStale = useCallback(async () => {
@@ -115,8 +116,9 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
       if (!fresh.length) return;
 
       // Diff and record history for changed stories
+      const prev = storiesRef.current;
       for (const newStory of fresh) {
-        const old = stories.find((s) => s.index === newStory.index);
+        const old = prev.find((s) => s.index === newStory.index);
         if (!old) continue;
         const changed = diffFields(old, newStory);
         if (changed.length === 0) continue;
@@ -136,9 +138,14 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
       }
 
       setStories(fresh);
+      // If the editor is open, update its story so it sees background changes
+      setEditing((prev) => {
+        if (!prev) return null;
+        return fresh.find((s) => s.index === prev.index) ?? prev;
+      });
       if (data.approvals) setApprovals(data.approvals);
     } catch {}
-  }, [date, stories]);
+  }, [date]);
 
   useEffect(() => {
     const handler = () => { refreshStories(); checkStale(); };
