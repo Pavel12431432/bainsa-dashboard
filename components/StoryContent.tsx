@@ -158,9 +158,7 @@ export default function StoryContent({ story }: { story: Story }) {
 
       {/* Header row — pushed down to clear IG chrome overlay */}
       <div className="flex items-center justify-between pt-5" style={{ position: "relative", zIndex: 2 }}>
-        <span className="story-logo text-[length:var(--text-logo)] font-semibold text-brand-white tracking-[0.08em]">
-          BAINSA
-        </span>
+        <img src="/bainsa-logo.png" alt="BAINSA" className="block" style={{ height: "1.5rem" }} draggable={false} />
         <CornerIcon type={cornerAccent} color={accentColor} size={iconSize} />
       </div>
 
