@@ -6,6 +6,39 @@ function extractField(block: string, key: string): string {
   return m ? m[1].trim() : "";
 }
 
+/** Extract body field, capturing continuation lines that start with > (bullet lines). */
+function extractBody(block: string): string {
+  const re = /\*\*Body:\*\*[ \t]*(.*)/i;
+  const m = block.match(re);
+  if (!m) return "";
+
+  const firstLine = m[1].trim();
+  // Find where the match ends in the block and look for continuation lines
+  const matchEnd = block.indexOf(m[0]) + m[0].length;
+  const rest = block.slice(matchEnd);
+  const lines = rest.split("\n");
+  const continuations: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    // Continuation lines start with > (bullet points)
+    if (trimmed.startsWith(">")) {
+      continuations.push(trimmed);
+    } else if (trimmed === "") {
+      // Skip blank lines between bullets
+      continue;
+    } else {
+      // Hit another field or non-bullet content
+      break;
+    }
+  }
+
+  if (continuations.length > 0) {
+    return [firstLine, ...continuations].join("\n");
+  }
+  return firstLine;
+}
+
 function parseLayout(val: string): Layout {
   const v = val.toLowerCase();
   if (v === "center" || v === "bottom") return v;
@@ -105,7 +138,7 @@ export function parseStories(markdown: string): Story[] {
       accentBar: parseAccentBar(extractField(section, "Accent bar")),
       ghostAccent: parseGhostAccent(extractField(section, "Ghost accent")),
       headline: extractField(section, "Headline"),
-      body: extractField(section, "Body"),
+      body: extractBody(section),
       sourceTag: extractField(section, "Source tag"),
       cornerAccent: extractField(section, "Corner accent") === "+" ? "+" : ">",
     });
