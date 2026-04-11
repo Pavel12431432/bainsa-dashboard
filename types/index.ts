@@ -55,3 +55,8 @@ export interface HistoryEntry {
   label: string;
   timestamp: string;
 }
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}

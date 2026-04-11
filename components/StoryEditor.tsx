@@ -3,6 +3,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Story, HistoryEntry, ACCENT_COLORS } from "@/types";
 import { apiFetch } from "@/lib/fetch";
+import { clearUpdated } from "@/lib/storyChatTracker";
+import { applyUpdates, diffFields, storyEqual, FIELD_LABELS } from "@/lib/storyUtils";
+import { storyChatSessionKey } from "@/lib/chat";
 import StoryCard from "./StoryCard";
 import PhonePreview from "./PhonePreview";
 import StoryChat from "./StoryChat";
@@ -24,7 +27,7 @@ interface Pending {
 }
 
 function getSessionId(date: string, index: number): string {
-  const key = `sofia-session:${date}:${index}`;
+  const key = storyChatSessionKey(date, index);
   let id = localStorage.getItem(key);
   if (!id) {
     id = crypto.randomUUID();
@@ -32,51 +35,6 @@ function getSessionId(date: string, index: number): string {
   }
   return id;
 }
-
-function applyUpdates(prev: Story, updates: Partial<Story>): Story {
-  const next = { ...prev };
-  for (const [key, value] of Object.entries(updates)) {
-    if (key in prev && typeof value === "string") {
-      (next as Record<string, unknown>)[key] = value;
-    }
-  }
-  if (updates.division && ACCENT_COLORS[updates.division]) {
-    next.accentColor = ACCENT_COLORS[updates.division];
-  }
-  return next;
-}
-
-/** Compare two stories and return the keys that differ (excluding index/title) */
-const COMPARABLE_KEYS = [
-  "headline", "body", "sourceTag", "division", "accentColor",
-  "cornerAccent", "layout", "contentType", "headlineSize",
-  "bodyWeight", "textAlign", "cornerSize", "accentBar", "ghostAccent",
-] as const satisfies readonly (keyof Story)[];
-
-function diffFields(a: Story, b: Story): string[] {
-  return COMPARABLE_KEYS.filter((k) => a[k] !== b[k]);
-}
-
-function storyEqual(a: Story, b: Story): boolean {
-  return COMPARABLE_KEYS.every((k) => a[k] === b[k]);
-}
-
-const FIELD_LABELS: Record<string, string> = {
-  headline: "headline",
-  body: "body",
-  sourceTag: "source tag",
-  division: "division",
-  accentColor: "accent color",
-  cornerAccent: "corner accent",
-  layout: "layout",
-  contentType: "content type",
-  headlineSize: "headline size",
-  bodyWeight: "body weight",
-  textAlign: "text align",
-  cornerSize: "corner size",
-  accentBar: "accent bar",
-  ghostAccent: "ghost accent",
-};
 
 export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
   const [draft, setDraft] = useState<Story>({ ...story });
@@ -115,6 +73,7 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
 
   useEffect(() => {
     setSessionId(getSessionId(date, story.index));
+    clearUpdated(date, story.index);
   }, [date, story.index]);
 
   useEffect(() => {
@@ -186,9 +145,8 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
   }
 
   function handleReset() {
-    const key = `sofia-session:${date}:${story.index}`;
     const id = crypto.randomUUID();
-    localStorage.setItem(key, id);
+    localStorage.setItem(storyChatSessionKey(date, story.index), id);
     setSessionId(id);
   }
 

@@ -1,13 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
-import { Story } from "@/types";
+import { useState, useRef, useEffect } from "react";
+import { Story, ChatMessage } from "@/types";
 import { apiFetch } from "@/lib/fetch";
-
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-}
+import { applyUpdates } from "@/lib/storyUtils";
+import { autoResize, handleChatKeyDown, loadMessages, saveMessages, storyChatKey } from "@/lib/chat";
+import { markLoading, clearLoading, markUpdated, isStoryChatLoading } from "@/lib/storyChatTracker";
 
 interface Props {
   story: Story;
@@ -18,66 +16,55 @@ interface Props {
   disabled?: boolean;
 }
 
-function storageKey(date: string, index: number, sessionId: string) {
-  return `sofia-messages:${date}:${index}:${sessionId}`;
-}
-
 export default function StoryChat({ story, date, sessionId, onUpdate, onReset, disabled }: Props) {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(() => isStoryChatLoading(date, story.index));
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const loaded = useRef(false);
+  const mountedRef = useRef(true);
 
-  const key = storageKey(date, story.index, sessionId);
+  const key = storyChatKey(date, story.index, sessionId);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   // Load messages from localStorage on mount or session change
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(key);
-      setMessages(stored ? JSON.parse(stored) : []);
-    } catch {
-      setMessages([]);
-    }
-    loaded.current = true;
-  }, [key]);
-
-  // Persist messages to localStorage
-  const persist = useCallback(
-    (msgs: Message[]) => {
-      if (loaded.current) localStorage.setItem(key, JSON.stringify(msgs));
-    },
-    [key],
-  );
+    setMessages(loadMessages(key));
+    setLoading(isStoryChatLoading(date, story.index));
+  }, [key, date, story.index]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  function autoResize() {
-    const el = inputRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 120) + "px";
-  }
-
   async function send() {
     const text = input.trim();
     if (!text || loading) return;
+
+    // Capture at call time so the request completes even if the editor closes
+    const currentDate = date;
+    const currentIndex = story.index;
+    const currentStory = { ...story };
+    const currentSessionId = sessionId;
+    const currentKey = key;
 
     setInput("");
     if (inputRef.current) inputRef.current.style.height = "auto";
     const withUser = [...messages, { role: "user" as const, content: text }];
     setMessages(withUser);
-    persist(withUser);
+    saveMessages(currentKey, withUser);
     setLoading(true);
+    markLoading(currentDate, currentIndex);
 
     try {
-      const res = await apiFetch(`/api/stories/${date}/${story.index}/chat`, {
+      const res = await apiFetch(`/api/stories/${currentDate}/${currentIndex}/chat`, {
         message: text,
-        story,
-        sessionId,
+        story: currentStory,
+        sessionId: currentSessionId,
       });
 
       if (!res.ok) {
@@ -87,24 +74,31 @@ export default function StoryChat({ story, date, sessionId, onUpdate, onReset, d
       const data = await res.json();
 
       const withReply = [...withUser, { role: "assistant" as const, content: data.reply }];
-      setMessages(withReply);
-      persist(withReply);
-      if (data.updates) onUpdate(data.updates);
+      saveMessages(currentKey, withReply);
+
+      if (mountedRef.current) {
+        setMessages(withReply);
+        if (data.updates) onUpdate(data.updates);
+      } else if (data.updates) {
+        // Editor was closed — auto-save the updates directly
+        const updated = applyUpdates(currentStory, data.updates);
+        await apiFetch(`/api/stories/${currentDate}/${currentIndex}/update`, updated);
+        markUpdated(currentDate, currentIndex);
+        document.dispatchEvent(new CustomEvent("stories-changed"));
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Something went wrong";
       const withError = [...withUser, { role: "assistant" as const, content: `Error: ${msg}` }];
-      setMessages(withError);
-      persist(withError);
+      saveMessages(currentKey, withError);
+      if (mountedRef.current) {
+        setMessages(withError);
+      }
     } finally {
-      setLoading(false);
-      inputRef.current?.focus();
-    }
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      send();
+      clearLoading(currentDate, currentIndex);
+      if (mountedRef.current) {
+        setLoading(false);
+        inputRef.current?.focus();
+      }
     }
   }
 
@@ -166,8 +160,8 @@ export default function StoryChat({ story, date, sessionId, onUpdate, onReset, d
             <textarea
               ref={inputRef}
               value={input}
-              onChange={(e) => { setInput(e.target.value); autoResize(); }}
-              onKeyDown={handleKeyDown}
+              onChange={(e) => { setInput(e.target.value); autoResize(inputRef.current); }}
+              onKeyDown={(e) => handleChatKeyDown(e, send)}
               placeholder="Ask Sofia..."
               rows={1}
               className="flex-1 bg-border border border-border-mid rounded-md px-3 py-2 text-xs text-brand-white resize-none outline-none overflow-y-auto"

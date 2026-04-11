@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { ChatMessage } from "@/types";
 import { apiFetch } from "@/lib/fetch";
+import { autoResize, handleChatKeyDown, loadMessages, saveMessages, agentChatKey, agentChatSessionKey } from "@/lib/chat";
 import { renderMarkdown } from "@/lib/markdown";
 import SlidePanel from "./SlidePanel";
-
 
 type Agent = "MARCO" | "SOFIA";
 
@@ -20,11 +21,6 @@ interface Status {
   sofia: AgentStatus;
 }
 
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-}
-
 interface Props {
   date: string;
   open: boolean;
@@ -37,7 +33,7 @@ interface Props {
 }
 
 function getSessionId(date: string, agent: string): string {
-  const key = `agent-chat-session:${date}:${agent}`;
+  const key = agentChatSessionKey(date, agent);
   let id = localStorage.getItem(key);
   if (!id) {
     id = crypto.randomUUID();
@@ -46,16 +42,12 @@ function getSessionId(date: string, agent: string): string {
   return id;
 }
 
-function messagesKey(date: string, agent: string, sessionId: string) {
-  return `agent-chat:${date}:${agent}:${sessionId}`;
-}
-
 export default function AgentChat({ date, open, agent, outputExpanded, onClose, onSwitchAgent, onLoadingChange, agentLoading }: Props) {
   const [status, setStatus] = useState<Status | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
   const [expanded, setExpanded] = useState(outputExpanded);
   const [outputHeight, setOutputHeight] = useState(200);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const isLoading = agent ? agentLoading[agent] : false;
@@ -87,20 +79,16 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
     const agentLower = agent.toLowerCase();
     const sid = getSessionId(date, agentLower);
     setSessionId(sid);
-    try {
-      const stored = localStorage.getItem(messagesKey(date, agentLower, sid));
-      setMessages(stored ? JSON.parse(stored) : []);
-    } catch {
-      setMessages([]);
-    }
+    setMessages(loadMessages(agentChatKey(date, agentLower, sid)));
     loaded.current = true;
   }, [open, agent, date]);
 
-  function persistMessages(msgs: Message[], forAgent?: string, forSessionId?: string) {
+  function persistMessages(msgs: ChatMessage[], forAgent?: string, forSessionId?: string, forDate?: string) {
     const a = forAgent ?? agent?.toLowerCase();
     const sid = forSessionId ?? sessionId;
+    const d = forDate ?? date;
     if (loaded.current && a && sid) {
-      localStorage.setItem(messagesKey(date, a, sid), JSON.stringify(msgs));
+      saveMessages(agentChatKey(d, a, sid), msgs);
     }
   }
 
@@ -116,12 +104,6 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
     }
   }, [messages, isLoading]);
 
-  function autoResize() {
-    const el = inputRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 120) + "px";
-  }
 
   async function send() {
     const text = input.trim();
@@ -131,19 +113,22 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
     const currentAgent = agent;
     const currentAgentLower = agent.toLowerCase();
     const currentSessionId = sessionId;
+    const currentDate = date;
     const isNewSession = messages.length === 0;
 
     setInput("");
     if (inputRef.current) inputRef.current.style.height = "auto";
     const withUser = [...messages, { role: "user" as const, content: text }];
     setMessages(withUser);
-    persistMessages(withUser, currentAgentLower, currentSessionId);
+    persistMessages(withUser, currentAgentLower, currentSessionId, currentDate);
     onLoadingChange(currentAgent, true);
 
     try {
+      // Include date context so the agent knows which date we're viewing
+      const contextMessage = `[Viewing stories for ${currentDate}]\n\n${text}`;
       const res = await apiFetch("/api/agent-chat", {
         agent: currentAgentLower,
-        message: text,
+        message: contextMessage,
         sessionId: currentSessionId,
         newSession: isNewSession,
       });
@@ -157,7 +142,7 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
 
       const withReply = [...withUser, { role: "assistant" as const, content: reply }];
       setMessages(withReply);
-      persistMessages(withReply, currentAgentLower, currentSessionId);
+      persistMessages(withReply, currentAgentLower, currentSessionId, currentDate);
 
       // Refetch agent status so collapsible output updates if agent modified files
       fetch(`/api/agent-status?date=${date}`)
@@ -170,7 +155,7 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
       const msg = err instanceof Error ? err.message : "Something went wrong";
       const withError = [...withUser, { role: "assistant" as const, content: `Error: ${msg}` }];
       setMessages(withError);
-      persistMessages(withError, currentAgentLower, currentSessionId);
+      persistMessages(withError, currentAgentLower, currentSessionId, currentDate);
     } finally {
       onLoadingChange(currentAgent, false);
       inputRef.current?.focus();
@@ -180,13 +165,11 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
   function reset() {
     if (!agent) return;
     const agentLower = agent.toLowerCase();
-    // Clear old session
     if (sessionId) {
-      localStorage.removeItem(messagesKey(date, agentLower, sessionId));
+      localStorage.removeItem(agentChatKey(date, agentLower, sessionId));
     }
-    // New session
     const newId = crypto.randomUUID();
-    localStorage.setItem(`agent-chat-session:${date}:${agentLower}`, newId);
+    localStorage.setItem(agentChatSessionKey(date, agentLower), newId);
     setSessionId(newId);
     setMessages([]);
   }
@@ -218,12 +201,6 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
     document.addEventListener("touchend", onEnd);
   }
 
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      send();
-    }
-  }
 
   const current = agent === "MARCO" ? status?.marco : status?.sofia;
   const label = agent === "MARCO" ? "articles" : "stories";
@@ -343,8 +320,8 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
             <textarea
               ref={inputRef}
               value={input}
-              onChange={(e) => { setInput(e.target.value); autoResize(); }}
-              onKeyDown={handleKeyDown}
+              onChange={(e) => { setInput(e.target.value); autoResize(inputRef.current); }}
+              onKeyDown={(e) => handleChatKeyDown(e, send)}
               placeholder={`Ask ${agent === "MARCO" ? "Marco" : "Sofia"}...`}
               rows={1}
               className="flex-1 bg-border border border-border-mid rounded-md px-3 py-2 text-xs text-brand-white resize-none outline-none overflow-y-auto"

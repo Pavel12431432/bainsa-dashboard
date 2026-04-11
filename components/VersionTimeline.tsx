@@ -33,12 +33,14 @@ export default function VersionTimeline({ entries, viewingIdx, onSelect, onResto
             Viewing: {entries[viewingIdx].label}
           </p>
           <div className="flex gap-2 shrink-0">
-            <button
-              onClick={onRestore}
-              className="text-[0.65rem] font-semibold text-success bg-transparent border border-success/30 rounded px-2.5 py-1 cursor-pointer hover:bg-success/10"
-            >
-              RESTORE
-            </button>
+            {viewingIdx < entries.length - 1 && (
+              <button
+                onClick={onRestore}
+                className="text-[0.65rem] font-semibold text-success bg-transparent border border-success/30 rounded px-2.5 py-1 cursor-pointer hover:bg-success/10"
+              >
+                RESTORE
+              </button>
+            )}
             <button
               onClick={onBack}
               className="text-[0.65rem] font-semibold text-muted bg-transparent border border-border-mid rounded px-2.5 py-1 cursor-pointer hover:text-brand-white"

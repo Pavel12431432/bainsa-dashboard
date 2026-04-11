@@ -118,6 +118,10 @@ body {
   100% { outline: 2px solid transparent; outline-offset: 4px; }
 }
 
+@keyframes fadeOut {
+  to { opacity: 0; }
+}
+
 .highlight-pulse {
   animation: highlight-fade 2s ease-out forwards;
   border-radius: 16px;

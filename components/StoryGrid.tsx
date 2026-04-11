@@ -4,16 +4,13 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Story, ApprovalState } from "@/types";
 import { apiFetch } from "@/lib/fetch";
 import { checkCompliance } from "@/lib/compliance";
+import { diffFields } from "@/lib/storyUtils";
+import { isStoryChatLoading, isUpdatedUnseen, clearUpdated, subscribe as subscribeChatTracker } from "@/lib/storyChatTracker";
 import StoryCard from "./StoryCard";
 import ComplianceBadge from "./ComplianceBadge";
 import StoryEditor from "./StoryEditor";
 import ExportDialog from "./ExportDialog";
 
-const STORY_FIELDS = ["headline", "body", "sourceTag", "division", "cornerAccent", "accentColor"] as const;
-
-function storyChanged(a: Story, b: Story): string[] {
-  return STORY_FIELDS.filter((f) => a[f] !== b[f]) as string[];
-}
 
 interface Props {
   date: string;
@@ -63,6 +60,10 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
   const [showExport, setShowExport] = useState(false);
   const [stale, setStale] = useState<string | null>(null); // Marco's lastRun if stale
   const [regenerating, setRegenerating] = useState(false);
+  const [, forceUpdate] = useState(0);
+
+  // Subscribe to story chat loading state changes
+  useEffect(() => subscribeChatTracker(() => forceUpdate((n) => n + 1)), []);
 
   // Check if stories are stale (Marco updated after Sofia)
   const checkStale = useCallback(async () => {
@@ -117,7 +118,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
       for (const newStory of fresh) {
         const old = stories.find((s) => s.index === newStory.index);
         if (!old) continue;
-        const changed = storyChanged(old, newStory);
+        const changed = diffFields(old, newStory);
         if (changed.length === 0) continue;
 
         // Record original if no history exists yet
@@ -271,6 +272,8 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
           const compliance = checkCompliance(story);
           const approved = approvals.approved.includes(story.index);
           const rejected = approvals.rejected.includes(story.index);
+          const chatThinking = isStoryChatLoading(date, story.index);
+          const chatUpdated = !chatThinking && isUpdatedUnseen(date, story.index);
 
           return (
             <div key={story.index} id={`story-${story.index}`} className="group/card">
@@ -283,6 +286,23 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
                 )}
                 {rejected && (
                   <div className="absolute inset-0 rounded-2xl border border-danger/25 bg-black/45 pointer-events-none" style={{ boxShadow: "0 0 16px rgba(239,68,68,0.35), 0 0 40px rgba(239,68,68,0.12)" }} />
+                )}
+                {chatThinking && (
+                  <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-black/70 backdrop-blur-sm z-10">
+                    <svg className="animate-spin h-3 w-3 text-brand-white" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    <span className="text-[0.6rem] font-semibold text-brand-white opacity-70">Sofia</span>
+                  </div>
+                )}
+                {chatUpdated && (
+                  <div
+                    className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-success/15 border border-success/30 backdrop-blur-sm z-10 animate-[fadeOut_0.5s_ease_3s_forwards]"
+                    onAnimationEnd={() => clearUpdated(date, story.index)}
+                  >
+                    <span className="text-[0.6rem] font-semibold text-success">Sofia updated</span>
+                  </div>
                 )}
                 {!compliance.pass && (
                   <div className="absolute bottom-2 left-2 right-2 group-hover/card:opacity-0 transition-opacity duration-150">
