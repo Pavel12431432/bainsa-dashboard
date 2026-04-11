@@ -25,13 +25,27 @@ export async function writeApprovals(date: string, state: ApprovalState): Promis
 export async function setApproval(
   date: string,
   index: number,
-  action: "approve" | "reject" | "clear"
+  action: "approve" | "reject" | "clear",
+  feedback?: string
 ): Promise<ApprovalState> {
   const state = await readApprovals(date);
   state.approved = state.approved.filter((i) => i !== index);
   state.rejected = state.rejected.filter((i) => i !== index);
+  state.feedback ??= {};
+  if (action === "approve" || action === "clear") {
+    delete state.feedback[index];
+  }
+  if (action === "reject") {
+    state.rejected.push(index);
+    if (feedback) {
+      state.feedback[index] = feedback;
+    } else {
+      delete state.feedback[index];
+    }
+  }
   if (action === "approve") state.approved.push(index);
-  if (action === "reject") state.rejected.push(index);
+  // Clean up empty feedback object
+  if (Object.keys(state.feedback).length === 0) delete state.feedback;
   await writeApprovals(date, state);
   return state;
 }

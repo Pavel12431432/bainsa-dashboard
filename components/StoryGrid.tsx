@@ -62,6 +62,11 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
   const [showExport, setShowExport] = useState(false);
   const [stale, setStale] = useState<string | null>(null); // Marco's lastRun if stale
   const [regenerating, setRegenerating] = useState(false);
+  const [rejectingIndex, setRejectingIndex] = useState<number | null>(null);
+  const feedbackRef = useRef<HTMLTextAreaElement | null>(null);
+  const setFeedbackRef = useCallback((el: HTMLTextAreaElement | null) => {
+    if (el && el.offsetParent !== null) feedbackRef.current = el;
+  }, []);
 
   // Re-render when story chat loading/updated state changes
   useSyncExternalStore(subscribeChatTracker, getChatTrackerSnapshot);
@@ -153,12 +158,29 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
     return () => document.removeEventListener("stories-changed", handler);
   }, [refreshStories, checkStale]);
 
-  async function handleApprove(index: number, action: "approve" | "reject" | "clear") {
-    const res = await apiFetch(`/api/stories/${date}/${index}/approve`, { action });
+  async function handleApprove(index: number, action: "approve" | "reject" | "clear", feedback?: string) {
+    const res = await apiFetch(`/api/stories/${date}/${index}/approve`, { action, feedback });
     if (res.ok) {
       const data = await res.json();
       setApprovals(data.approvals);
     }
+  }
+
+  function startReject(index: number) {
+    setRejectingIndex(index);
+    // Focus textarea after render
+    setTimeout(() => feedbackRef.current?.focus(), 50);
+  }
+
+  function submitReject(index: number) {
+    const text = feedbackRef.current?.value.trim();
+    handleApprove(index, "reject", text || undefined);
+    setRejectingIndex(null);
+  }
+
+  function skipReject(index: number) {
+    handleApprove(index, "reject");
+    setRejectingIndex(null);
   }
 
   function handleSaved(updated: Story) {
@@ -291,7 +313,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
                 {approved && (
                   <div className="absolute inset-0 rounded-2xl border border-success/30 pointer-events-none" style={{ boxShadow: "0 0 16px rgba(34,197,94,0.4), 0 0 40px rgba(34,197,94,0.15)" }} />
                 )}
-                {rejected && (
+                {(rejected || rejectingIndex === story.index) && (
                   <div className="absolute inset-0 rounded-2xl border border-danger/25 bg-black/45 pointer-events-none" style={{ boxShadow: "0 0 16px rgba(239,68,68,0.35), 0 0 40px rgba(239,68,68,0.12)" }} />
                 )}
                 {chatThinking && (
@@ -318,65 +340,136 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
                 )}
 
                 {/* Action buttons — overlay bottom of card on hover (desktop only) */}
-                <div className="hidden sm:flex absolute bottom-0 left-0 right-0 rounded-b-2xl px-5 pb-5 pt-16 bg-gradient-to-t from-black/90 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity duration-150 gap-2">
-                  <button
-                    onClick={() => setEditing(story)}
-                    className={`${actionBtn} border border-border-mid bg-brand-black/80 text-brand-white backdrop-blur-sm`}
-                  >
-                    EDIT
-                  </button>
-                  <button
-                    onClick={() => handleApprove(story.index, approved ? "clear" : "approve")}
-                    className={`${actionBtn} border backdrop-blur-sm ${
-                      approved
-                        ? "border-success bg-success/20 text-success"
-                        : "border-border-mid bg-brand-black/80 text-brand-white"
-                    }`}
-                  >
-                    {approved ? "✓" : "APPROVE"}
-                  </button>
-                  <button
-                    onClick={() => handleApprove(story.index, rejected ? "clear" : "reject")}
-                    className={`${actionBtn} border backdrop-blur-sm ${
-                      rejected
-                        ? "border-danger bg-danger/20 text-danger"
-                        : "border-border-mid bg-brand-black/80 text-brand-white"
-                    }`}
-                  >
-                    {rejected ? "✕" : "REJECT"}
-                  </button>
+                <div className={`hidden sm:flex absolute bottom-0 left-0 right-0 rounded-b-2xl px-5 pb-5 pt-16 bg-gradient-to-t from-black/90 to-transparent transition-opacity duration-150 gap-2 ${
+                  rejectingIndex === story.index ? "opacity-100 flex-col" : "opacity-0 group-hover/card:opacity-100"
+                }`}>
+                  {rejectingIndex === story.index ? (
+                    <>
+                      <textarea
+                        ref={setFeedbackRef}
+                        rows={2}
+                        placeholder="What's wrong with this story?"
+                        className="w-full rounded-[5px] border border-border-mid bg-brand-black/80 text-brand-white text-xs px-3 py-2 resize-none placeholder:text-muted backdrop-blur-sm focus:outline-none focus:border-danger/50"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitReject(story.index); }
+                          if (e.key === "Escape") setRejectingIndex(null);
+                        }}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => skipReject(story.index)}
+                          className={`${actionBtn} border border-border-mid bg-brand-black/80 text-muted backdrop-blur-sm`}
+                        >
+                          SKIP
+                        </button>
+                        <button
+                          onClick={() => submitReject(story.index)}
+                          className={`${actionBtn} border border-danger/40 bg-danger/15 text-danger backdrop-blur-sm`}
+                        >
+                          SUBMIT
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => setEditing(story)}
+                        className={`${actionBtn} border border-border-mid bg-brand-black/80 text-brand-white backdrop-blur-sm`}
+                      >
+                        EDIT
+                      </button>
+                      <button
+                        onClick={() => handleApprove(story.index, approved ? "clear" : "approve")}
+                        className={`${actionBtn} border backdrop-blur-sm ${
+                          approved
+                            ? "border-success bg-success/20 text-success"
+                            : "border-border-mid bg-brand-black/80 text-brand-white"
+                        }`}
+                      >
+                        {approved ? "✓" : "APPROVE"}
+                      </button>
+                      <button
+                        onClick={() => rejected ? handleApprove(story.index, "clear") : startReject(story.index)}
+                        className={`${actionBtn} border backdrop-blur-sm ${
+                          rejected
+                            ? "border-danger bg-danger/20 text-danger"
+                            : "border-border-mid bg-brand-black/80 text-brand-white"
+                        }`}
+                      >
+                        {rejected ? "✕" : "REJECT"}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 
               {/* Action buttons — below card (mobile only) */}
-              <div className="flex sm:hidden gap-2 mt-2">
-                <button
-                  onClick={() => setEditing(story)}
-                  className={`${actionBtn} border border-border-mid bg-brand-black text-brand-white`}
-                >
-                  EDIT
-                </button>
-                <button
-                  onClick={() => handleApprove(story.index, approved ? "clear" : "approve")}
-                  className={`${actionBtn} border ${
-                    approved
-                      ? "border-success bg-success/20 text-success"
-                      : "border-border-mid bg-brand-black text-brand-white"
-                  }`}
-                >
-                  {approved ? "✓" : "APPROVE"}
-                </button>
-                <button
-                  onClick={() => handleApprove(story.index, rejected ? "clear" : "reject")}
-                  className={`${actionBtn} border ${
-                    rejected
-                      ? "border-danger bg-danger/20 text-danger"
-                      : "border-border-mid bg-brand-black text-brand-white"
-                  }`}
-                >
-                  {rejected ? "✕" : "REJECT"}
-                </button>
+              <div className="flex sm:hidden flex-col gap-2 mt-2">
+                {rejectingIndex === story.index ? (
+                  <>
+                    <textarea
+                      ref={setFeedbackRef}
+                      rows={2}
+                      placeholder="What's wrong with this story?"
+                      className="w-full rounded-[5px] border border-border-mid bg-brand-black text-brand-white text-xs px-3 py-2 resize-none placeholder:text-muted focus:outline-none focus:border-danger/50"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitReject(story.index); }
+                        if (e.key === "Escape") setRejectingIndex(null);
+                      }}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => skipReject(story.index)}
+                        className={`${actionBtn} border border-border-mid bg-brand-black text-muted`}
+                      >
+                        SKIP
+                      </button>
+                      <button
+                        onClick={() => submitReject(story.index)}
+                        className={`${actionBtn} border border-danger/40 bg-danger/15 text-danger`}
+                      >
+                        SUBMIT
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setEditing(story)}
+                      className={`${actionBtn} border border-border-mid bg-brand-black text-brand-white`}
+                    >
+                      EDIT
+                    </button>
+                    <button
+                      onClick={() => handleApprove(story.index, approved ? "clear" : "approve")}
+                      className={`${actionBtn} border ${
+                        approved
+                          ? "border-success bg-success/20 text-success"
+                          : "border-border-mid bg-brand-black text-brand-white"
+                      }`}
+                    >
+                      {approved ? "✓" : "APPROVE"}
+                    </button>
+                    <button
+                      onClick={() => rejected ? handleApprove(story.index, "clear") : startReject(story.index)}
+                      className={`${actionBtn} border ${
+                        rejected
+                          ? "border-danger bg-danger/20 text-danger"
+                          : "border-border-mid bg-brand-black text-brand-white"
+                      }`}
+                    >
+                      {rejected ? "✕" : "REJECT"}
+                    </button>
+                  </div>
+                )}
               </div>
+
+              {/* Feedback preview for rejected cards */}
+              {rejected && approvals.feedback?.[story.index] && rejectingIndex !== story.index && (
+                <p className="mt-2 text-xs text-danger/70 leading-snug line-clamp-2 px-1">
+                  {approvals.feedback[story.index]}
+                </p>
+              )}
             </div>
           );
         })}

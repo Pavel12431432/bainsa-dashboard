@@ -140,7 +140,7 @@ Default when unclear: **Culture** (not Analysis). Analysis should be rare.
 2. **Sofia** reads Marco's handoff + brand guidelines, writes `YYYY-MM-DD.md` to `STORIES_PATH` (daily at 12:30)
 3. Dashboard reads these files, parses stories, renders as 9:16 cards
 4. Edits write back to the same `.md` file via `replaceStory()` in `serializeStories.ts`
-5. Approvals stored in `YYYY-MM-DD.approved.json` sidecar next to stories
+5. Approvals stored in `YYYY-MM-DD.approved.json` sidecar next to stories (includes optional `feedback` map: story index -> rejection reason)
 6. Version history stored in `YYYY-MM-DD.history.json` sidecar next to stories
 
 ## Story markdown format (current Sofia output)
@@ -258,7 +258,7 @@ interface ChatMessage {
 | `SlidePanel.tsx` | Shared slide-out panel: `side` (left/right), `width`, `title` (ReactNode), `onClose`. 220ms translateX animation. |
 | `HamburgerMenu.tsx` | Left slide-out: search bar (debounced, results as links with `?highlight`), agent output triggers, logout. |
 | `AgentChat.tsx` | Right slide-out chat with Marco/Sofia. Agent tabs for switching. Collapsible+draggable output block, message list (localStorage persisted), text input. Derives `isLoading` from parent's `agentLoading[agent]` (not local state) so thinking indicator persists across drawer open/close. Captures `agent`, `sessionId`, and `date` in `send()` closure so requests complete even if drawer closes mid-flight. Prepends `[Viewing stories for DATE]` to messages so agents know which date is active. |
-| `StoryGrid.tsx` | 4-col grid (responsive). Approve/reject/edit buttons per card — hover overlay on desktop, separate row below card on mobile. Approved cards get green outer glow, rejected get red glow + dark overlay. Compliance badges on failing cards with hover tooltips (card column gets `z-10` on badge hover to prevent clipping). Stale stories banner when Marco ran after Sofia. Export button at bottom (shows approved count if any). Listens for `stories-changed` CustomEvent to refetch. Uses `useSyncExternalStore` with `storyChatTracker` for Sofia loading spinner and "Sofia updated" pill on cards. Updates `editing` state when stories refresh so the open editor receives background changes. Uses `storiesRef` for stable `refreshStories` callback identity. Division filter pills. |
+| `StoryGrid.tsx` | 4-col grid (responsive). Approve/reject/edit buttons per card — hover overlay on desktop, separate row below card on mobile. Reject flow: clicking REJECT shows inline feedback textarea with SKIP/SUBMIT buttons; feedback stored in approval sidecar. Rejected cards show feedback preview below. Approved cards get green outer glow, rejected get red glow + dark overlay. Compliance badges on failing cards with hover tooltips (card column gets `z-10` on badge hover to prevent clipping). Stale stories banner when Marco ran after Sofia. Export button at bottom (shows approved count if any). Listens for `stories-changed` CustomEvent to refetch. Uses `useSyncExternalStore` with `storyChatTracker` for Sofia loading spinner and "Sofia updated" pill on cards. Updates `editing` state when stories refresh so the open editor receives background changes. Uses `storiesRef` for stable `refreshStories` callback identity. Division filter pills. |
 | `StoryCard.tsx` | Card shell: fixed scale (editor) or auto-scale via `useLayoutEffect` + `ResizeObserver` (grid). |
 | `StoryContent.tsx` | Inner 9:16 story design: accent border, BAINSA logo, chevron/plus SVG, headline (Alliance No.2), body, source. |
 | `StoryEditor.tsx` | Edit modal. Desktop: preview + form + chat (3 cols). Preview has CARD/PHONE toggle (persisted to localStorage) and fullscreen expand button. Mobile: FIELDS/SOFIA tabs. Sofia suggestions auto-save immediately; OK dismisses the diff banner, REVERT undoes and saves (red hover accent). Detects external story prop changes (background Sofia auto-save) and shows the same diff banner. Inline diff shows strikethrough old + green new. Version history with restore. |
@@ -372,8 +372,8 @@ All mutation endpoints require `X-Requested-With: fetch` header (CSRF prevention
 
 ## What's NOT built yet
 
-- Reject feedback loop (Sofia learns from rejections)
-- A/B testing for story variants
+- Reject feedback loop (Sofia learns from rejections) — feedback collection is done, editor agent to distill feedback into adaptive instructions is not
+- A/B testing for story variants (on-demand alternative generation)
 - Tinder-style swipe approve/reject on mobile
 - Activity logging (agent calls, story changes, logins)
 - Mobile keyboard fix for slide-out panels (iOS pushes content)

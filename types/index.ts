@@ -29,6 +29,7 @@ export interface Story {
 export interface ApprovalState {
   approved: number[];   // 1-based story indices
   rejected: number[];
+  feedback?: Record<number, string>;  // story index -> rejection reason
 }
 
 export interface ComplianceCheck {

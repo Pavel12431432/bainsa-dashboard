@@ -18,7 +18,7 @@ export async function POST(
     return NextResponse.json({ error: "Invalid params" }, { status: 400 });
   }
 
-  const { action } = await req.json();
-  const state = await setApproval(date, parseInt(index, 10), action);
+  const { action, feedback } = await req.json();
+  const state = await setApproval(date, parseInt(index, 10), action, feedback);
   return NextResponse.json({ ok: true, approvals: state });
 }
