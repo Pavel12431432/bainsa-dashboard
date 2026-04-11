@@ -119,7 +119,10 @@ export default function StoryChat({ story, date, sessionId, onUpdate, onReset, d
     <div className="flex flex-col h-full min-h-0">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-3 border-b border-border-light shrink-0">
-        <span className="text-[0.65rem] font-semibold text-muted tracking-[0.08em]">SOFIA</span>
+        <span className="text-[0.65rem] font-semibold text-muted tracking-[0.08em] flex items-center gap-2">
+          SOFIA
+          <span className={`w-[6px] h-[6px] rounded-full shrink-0 bg-success ${loading ? "animate-pulse" : ""}`} />
+        </span>
         {messages.length > 0 && (
           <button
             onClick={onReset}

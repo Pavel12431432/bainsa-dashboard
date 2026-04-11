@@ -223,7 +223,7 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
             {a}
             {!statusLoading && st && (
               <div
-                className="w-[5px] h-[5px] rounded-full shrink-0"
+                className={`w-[5px] h-[5px] rounded-full shrink-0 ${agentLoading[a] ? "animate-pulse" : ""}`}
                 style={{ background: st.ranToday ? "#22c55e" : "#555" }}
               />
             )}
