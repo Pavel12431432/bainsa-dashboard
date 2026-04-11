@@ -216,8 +216,8 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
       >
         {/* Preview — hidden below lg, fixed-size container so toggling doesn't shift layout */}
         <div className="p-8 bg-brand-black flex flex-col items-center justify-center shrink-0 border-r border-border max-lg:hidden gap-4">
-          <div className="flex items-center justify-center" style={{ width: 292, height: 518 }}>
-            <div className="group/preview relative">
+          <div className="flex items-center justify-center" style={{ width: 294, height: 521 }}>
+            <div className="group/preview relative cursor-pointer" onClick={() => setFullscreen(true)}>
               {preview === "card" ? (
                 <StoryCard story={draft} scale={0.72} />
               ) : (

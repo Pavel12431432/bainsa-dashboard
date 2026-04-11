@@ -37,8 +37,8 @@ export default function StoryCard({ story, scale }: Props) {
       <div
         className="relative overflow-hidden shrink-0 bg-brand-black border border-border-light rounded-2xl"
         style={{
-          width: 405 * scale,
-          height: 720 * scale,
+          width: 405 * scale + 2,
+          height: 720 * scale + 2,
           boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
         }}
       >
