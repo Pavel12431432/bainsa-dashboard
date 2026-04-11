@@ -23,6 +23,11 @@ export function checkRateLimit(ip: string): { allowed: boolean; retryAfter?: num
 export function recordFailure(ip: string): void {
   const now = Date.now();
   const entry = store.get(ip) ?? { count: 0, lockedUntil: 0 };
+  // Reset count if previous lockout has expired
+  if (entry.lockedUntil > 0 && entry.lockedUntil <= now) {
+    entry.count = 0;
+    entry.lockedUntil = 0;
+  }
   entry.count += 1;
   if (entry.count >= MAX_ATTEMPTS) {
     entry.lockedUntil = now + LOCKOUT_MS;

@@ -1,17 +1,33 @@
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createToken, COOKIE_NAME, MAX_AGE } from "@/lib/auth";
 import { todayRome } from "@/lib/date";
+import { checkRateLimit, recordFailure, clearAttempts } from "@/lib/rateLimit";
 
 async function login(formData: FormData) {
   "use server";
+
+  const hdrs = await headers();
+  const ip = hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+
+  const limit = checkRateLimit(ip);
+  if (!limit.allowed) {
+    redirect(`/login?error=locked&retry=${limit.retryAfter}`);
+  }
 
   const password = formData.get("password") as string;
   const expected = process.env.DASHBOARD_PASSWORD;
 
   if (!expected || password !== expected) {
+    recordFailure(ip);
+    const recheck = checkRateLimit(ip);
+    if (!recheck.allowed) {
+      redirect(`/login?error=locked&retry=${recheck.retryAfter}`);
+    }
     redirect("/login?error=1");
   }
+
+  clearAttempts(ip);
 
   const token = createToken();
   const jar = await cookies();
@@ -37,9 +53,7 @@ export default async function LoginPage({
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center bg-brand-black">
-      <p className="text-2xl font-semibold text-brand-white tracking-[0.1em] mb-12">
-        BAINSA
-      </p>
+      <img src="/bainsa-logo.png" alt="BAINSA" className="h-9 mb-12" />
 
       <form
         className="login-form flex flex-col gap-4 w-full max-w-80"

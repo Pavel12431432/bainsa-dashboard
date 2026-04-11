@@ -232,7 +232,7 @@ interface ChatMessage {
 | `app/layout.tsx` | Root layout: Alliance No.1 font, html/body setup |
 | `app/globals.css` | CSS vars, Tailwind `@theme inline` tokens, `.story-card`/`.story-content`, login `:has()`, highlight pulse animation, `@font-face` declarations |
 | `app/icon.png` | Favicon — BAINSA "B" icon, 180x180 white on black |
-| `app/login/page.tsx` | Login form with Server Action. Sets httpOnly cookie. |
+| `app/login/page.tsx` | Login form with Server Action. Sets httpOnly cookie. Rate-limited (5 attempts, 15min lockout via `rateLimit.ts`). Uses BAINSA logo image. |
 | `app/stories/[date]/page.tsx` | Main view: reads stories + approvals, renders `<HeaderShell>` + `<StoryGrid>`. Passes `?highlight` search param to grid. |
 
 ### API routes (`app/api/`)
@@ -280,7 +280,7 @@ interface ChatMessage {
 | `exportCards.ts` | PNG export: renders `StoryContent` offscreen via `createRoot`, captures with html2canvas-pro at 4x scale, downloads individually or as ZIP. |
 | `approvals.ts` | Read/write approval JSON sidecars. |
 | `auth.ts` | Cookie name, token creation/verification (constant-time compare). |
-| `rateLimit.ts` | In-memory IP rate limiter: 5 attempts, 15min lockout. |
+| `rateLimit.ts` | In-memory IP rate limiter: 5 attempts, 15min lockout. Count resets after lockout expires. Used by login Server Action. |
 | `openclaw.ts` | OpenClaw client via Docker CLI (`docker exec openclaw openclaw agent`). `chatWithAgent(agent, sessionId, message)` for both Marco and Sofia. Also `buildUserMessage()` (story editing system prompt with date-aware body limits and bullet rules) and `parseResponse()` (extracts JSON field updates from Sofia markdown). |
 | `fetch.ts` | Shared `apiFetch(url, body)` with `Content-Type` + `X-Requested-With: fetch` headers. |
 | `history.ts` | Read/write version history sidecars. Capped at 50 entries per story. |
