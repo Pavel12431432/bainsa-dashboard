@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import Link from "next/link";
 import DateNav from "./DateNav";
 import HamburgerMenu from "./HamburgerMenu";
 import AgentChat from "./AgentChat";
@@ -8,7 +9,7 @@ import AgentChat from "./AgentChat";
 type Agent = "MARCO" | "SOFIA";
 type OpenPanel = null | "menu" | "agent-marco" | "agent-sofia";
 
-export default function HeaderShell({ date }: { date: string }) {
+export default function HeaderShell({ date }: { date?: string }) {
   const [panel, setPanel] = useState<OpenPanel>(null);
   const [outputExpanded, setOutputExpanded] = useState(false);
   const [agentLoading, setAgentLoading] = useState<Record<Agent, boolean>>({ MARCO: false, SOFIA: false });
@@ -54,36 +55,40 @@ export default function HeaderShell({ date }: { date: string }) {
         </button>
 
         {/* Logo */}
-        <img src="/bainsa-logo.png" alt="BAINSA" className="h-9 mt-0.5 opacity-90" />
+        <Link href="/"><img src="/bainsa-logo.png" alt="BAINSA" className="h-9 mt-0.5 opacity-90" /></Link>
 
         {/* Date nav — centered overlay on desktop, inline on mobile */}
-        <div className="absolute inset-x-0 flex justify-center pointer-events-none max-sm:contents">
-          <DateNav date={date} className="pointer-events-auto max-sm:ml-auto" />
-        </div>
+        {date && (
+          <div className="absolute inset-x-0 flex justify-center pointer-events-none max-sm:contents">
+            <DateNav date={date} className="pointer-events-auto max-sm:ml-auto" />
+          </div>
+        )}
 
         {/* Spacer (pushes agent buttons right on desktop) */}
         <div className="flex-1 max-sm:hidden" />
 
         {/* Agent buttons */}
-        <div className="flex gap-2.5 max-sm:hidden">
-          {(["MARCO", "SOFIA"] as Agent[]).map((a) => (
-            <button
-              key={a}
-              onClick={() => openAgent(a, false)}
-              className={`relative px-4 py-[7px] rounded-[5px] border border-border-mid bg-transparent text-brand-white text-xs font-semibold tracking-[0.04em] cursor-pointer transition-opacity duration-150 hover:opacity-90 ${
-                agentLoading[a] ? "opacity-90" : "opacity-55"
-              }`}
-            >
-              {agentLoading[a] ? (
-                <svg className="animate-spin inline mr-1.5 h-2.5 w-2.5 -ml-0.5" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-              ) : "▸ "}
-              {a}
-              {agentUnread[a] && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-brand-white" />
-              )}
-            </button>
-          ))}
-        </div>
+        {date && (
+          <div className="flex gap-2.5 max-sm:hidden">
+            {(["MARCO", "SOFIA"] as Agent[]).map((a) => (
+              <button
+                key={a}
+                onClick={() => openAgent(a, false)}
+                className={`relative px-4 py-[7px] rounded-[5px] border border-border-mid bg-transparent text-brand-white text-xs font-semibold tracking-[0.04em] cursor-pointer transition-opacity duration-150 hover:opacity-90 ${
+                  agentLoading[a] ? "opacity-90" : "opacity-55"
+                }`}
+              >
+                {agentLoading[a] ? (
+                  <svg className="animate-spin inline mr-1.5 h-2.5 w-2.5 -ml-0.5" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                ) : "▸ "}
+                {a}
+                {agentUnread[a] && (
+                  <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-brand-white" />
+                )}
+              </button>
+            ))}
+          </div>
+        )}
       </header>
 
       {/* Shared backdrop */}
@@ -99,9 +104,10 @@ export default function HeaderShell({ date }: { date: string }) {
         open={panel === "menu"}
         onClose={close}
         onOpenAgentOutput={(a) => openAgent(a, true)}
+        hasDate={!!date}
       />
       <AgentChat
-        date={date}
+        date={date ?? ""}
         open={!!activeAgent}
         agent={activeAgent}
         outputExpanded={outputExpanded}

@@ -16,9 +16,10 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onOpenAgentOutput: (agent: Agent) => void;
+  hasDate?: boolean;
 }
 
-export default function HamburgerMenu({ open, onClose, onOpenAgentOutput }: Props) {
+export default function HamburgerMenu({ open, onClose, onOpenAgentOutput, hasDate }: Props) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -104,22 +105,51 @@ export default function HamburgerMenu({ open, onClose, onOpenAgentOutput }: Prop
           <hr className="border-none border-t border-[#1f1f1f] my-3 mx-6" />
         )}
 
-        {/* Agent outputs section */}
+        {/* Navigation */}
+        <Link
+          href="/"
+          onClick={onClose}
+          className="block w-full text-left px-6 py-3 text-[0.75rem] font-semibold text-brand-white opacity-55 hover:opacity-90 hover:bg-[#1a1a1a] transition-opacity duration-150 no-underline"
+        >
+          Today&apos;s Stories
+        </Link>
+
+        <hr className="border-none border-t border-[#1f1f1f] my-3 mx-6" />
+
+        {/* Agent outputs — mobile only, stories page only */}
+        {hasDate && (
+          <div className="sm:hidden">
+            <p className="px-6 py-2 text-[0.65rem] font-semibold text-brand-white opacity-25 tracking-[0.08em] uppercase">
+              Agent Outputs
+            </p>
+            <button
+              onClick={() => onOpenAgentOutput("MARCO")}
+              className="w-full text-left px-6 py-3 text-[0.75rem] font-semibold text-brand-white opacity-55 hover:opacity-90 hover:bg-[#1a1a1a] transition-opacity duration-150 bg-transparent border-none cursor-pointer"
+            >
+              Marco Output
+            </button>
+            <button
+              onClick={() => onOpenAgentOutput("SOFIA")}
+              className="w-full text-left px-6 py-3 text-[0.75rem] font-semibold text-brand-white opacity-55 hover:opacity-90 hover:bg-[#1a1a1a] transition-opacity duration-150 bg-transparent border-none cursor-pointer"
+            >
+              Sofia Output
+            </button>
+
+            <hr className="border-none border-t border-[#1f1f1f] my-3 mx-6" />
+          </div>
+        )}
+
+        {/* Tools */}
         <p className="px-6 py-2 text-[0.65rem] font-semibold text-brand-white opacity-25 tracking-[0.08em] uppercase">
-          Agent Outputs
+          Tools
         </p>
-        <button
-          onClick={() => onOpenAgentOutput("MARCO")}
-          className="w-full text-left px-6 py-3 text-[0.75rem] font-semibold text-brand-white opacity-55 hover:opacity-90 hover:bg-[#1a1a1a] transition-opacity duration-150 bg-transparent border-none cursor-pointer"
+        <Link
+          href="/teach"
+          onClick={onClose}
+          className="block w-full text-left px-6 py-3 text-[0.75rem] font-semibold text-brand-white opacity-55 hover:opacity-90 hover:bg-[#1a1a1a] transition-opacity duration-150 no-underline"
         >
-          Marco Output
-        </button>
-        <button
-          onClick={() => onOpenAgentOutput("SOFIA")}
-          className="w-full text-left px-6 py-3 text-[0.75rem] font-semibold text-brand-white opacity-55 hover:opacity-90 hover:bg-[#1a1a1a] transition-opacity duration-150 bg-transparent border-none cursor-pointer"
-        >
-          Sofia Output
-        </button>
+          Teach Sofia
+        </Link>
 
         <hr className="border-none border-t border-[#1f1f1f] my-3 mx-6" />
 
