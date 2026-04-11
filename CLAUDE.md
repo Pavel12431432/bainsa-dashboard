@@ -215,6 +215,11 @@ interface ComplianceResult {
 }
 
 const ACCENT_COLORS = { Analysis: "#fe6203", Projects: "#2c40e8", Culture: "#fe43a7" };
+
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
 ```
 
 ## File map
@@ -252,15 +257,15 @@ const ACCENT_COLORS = { Analysis: "#fe6203", Projects: "#2c40e8", Culture: "#fe4
 | `HeaderShell.tsx` | Client component owning all panel state. Renders header bar with hamburger, BAINSA logo (`/bainsa-logo.png`), DateNav, and agent buttons. Agent buttons show spinner when loading, white dot when unread. Manages `agentLoading` and `agentUnread` state passed to AgentChat. Uses `panelRef` to track current panel in callbacks. |
 | `SlidePanel.tsx` | Shared slide-out panel: `side` (left/right), `width`, `title` (ReactNode), `onClose`. 220ms translateX animation. |
 | `HamburgerMenu.tsx` | Left slide-out: search bar (debounced, results as links with `?highlight`), agent output triggers, logout. |
-| `AgentChat.tsx` | Right slide-out chat with Marco/Sofia. Agent tabs for switching. Collapsible+draggable output block, message list (localStorage persisted), text input. Derives `isLoading` from parent's `agentLoading[agent]` (not local state) so thinking indicator persists across drawer open/close. Captures `agent` and `sessionId` in `send()` closure so requests complete even if drawer closes mid-flight. |
-| `StoryGrid.tsx` | 4-col grid (responsive). Approve/reject/edit buttons per card — hover overlay on desktop, separate row below card on mobile. Approved cards get green outer glow, rejected get red glow + dark overlay. Compliance badges on failing cards with hover tooltips (card column gets `z-10` on badge hover to prevent clipping). Stale stories banner when Marco ran after Sofia. Export button at bottom (shows approved count if any). Listens for `stories-changed` CustomEvent to refetch. |
+| `AgentChat.tsx` | Right slide-out chat with Marco/Sofia. Agent tabs for switching. Collapsible+draggable output block, message list (localStorage persisted), text input. Derives `isLoading` from parent's `agentLoading[agent]` (not local state) so thinking indicator persists across drawer open/close. Captures `agent`, `sessionId`, and `date` in `send()` closure so requests complete even if drawer closes mid-flight. Prepends `[Viewing stories for DATE]` to messages so agents know which date is active. |
+| `StoryGrid.tsx` | 4-col grid (responsive). Approve/reject/edit buttons per card — hover overlay on desktop, separate row below card on mobile. Approved cards get green outer glow, rejected get red glow + dark overlay. Compliance badges on failing cards with hover tooltips (card column gets `z-10` on badge hover to prevent clipping). Stale stories banner when Marco ran after Sofia. Export button at bottom (shows approved count if any). Listens for `stories-changed` CustomEvent to refetch. Subscribes to `storyChatTracker` for Sofia loading spinner and "Sofia updated" pill on cards. Division filter pills. |
 | `StoryCard.tsx` | Card shell: fixed scale (editor) or auto-scale via `useLayoutEffect` + `ResizeObserver` (grid). |
 | `StoryContent.tsx` | Inner 9:16 story design: accent border, BAINSA logo, chevron/plus SVG, headline (Alliance No.2), body, source. |
 | `StoryEditor.tsx` | Edit modal. Desktop: preview + form + chat (3 cols). Preview has CARD/PHONE toggle (persisted to localStorage) and fullscreen expand button. Mobile: FIELDS/SOFIA tabs. Accept/revert for Sofia suggestions with inline diff (strikethrough old, green new). Version history with restore. |
 | `PhonePreview.tsx` | Instagram phone preview: frameless rounded screen (405x880) with story content (via `StoryContent`) overlaid by real iOS chrome images (`ig-chrome-top.png`, `ig-chrome-bottom.png`), progress bar, and BAINSA profile row. Accepts `story` and optional `scale` prop. |
 | `StoryFields.tsx` | Form fields with inline compliance warnings. Headline/body have char counters. Color mismatch warning shown below division row. Source tag shows warning when empty. Runs `checkCompliance()` on every render. |
-| `StoryChat.tsx` | Chat panel for inline Sofia editing in story editor. Messages persisted to localStorage. |
-| `VersionTimeline.tsx` | Scrollable version history with dot indicators, time-ago labels, restore/back. |
+| `StoryChat.tsx` | Chat panel for inline Sofia editing in story editor. Messages persisted to localStorage. Uses `mountedRef` to detect unmount — if editor closes mid-request, auto-saves updates via API and shows "Sofia updated" pill on the grid card. Uses `storyChatTracker` for loading state that survives unmount. |
+| `VersionTimeline.tsx` | Scrollable version history with dot indicators, time-ago labels, restore/back. Hides RESTORE button on the latest (current) entry. |
 | `DateNav.tsx` | Date navigation with `<Link prefetch>`. Calendar picker that grays out dates with no stories (fetches from `/api/story-dates`). |
 | `ComplianceBadge.tsx` | Card overlay showing failing compliance checks as red chips. Hover shows detail tooltip (centered, z-50). Badge tints red on hover for feedback. |
 | `ExportDialog.tsx` | Modal for selecting stories to export as PNG (ZIP or individual). Custom dark checkboxes. Smart pre-selection: approved stories if any, otherwise all. "Approved only" quick filter. Uses html2canvas-pro for rendering + JSZip for bundling. |
@@ -276,9 +281,12 @@ const ACCENT_COLORS = { Analysis: "#fe6203", Projects: "#2c40e8", Culture: "#fe4
 | `approvals.ts` | Read/write approval JSON sidecars. |
 | `auth.ts` | Cookie name, token creation/verification (constant-time compare). |
 | `rateLimit.ts` | In-memory IP rate limiter: 5 attempts, 15min lockout. |
-| `openclaw.ts` | OpenClaw client via Docker CLI (`docker exec openclaw openclaw agent`). `chatWithAgent(agent, sessionId, message)` for both Marco and Sofia. Also `buildUserMessage()` (story editing system prompt) and `parseResponse()` (extracts JSON field updates from Sofia markdown). |
+| `openclaw.ts` | OpenClaw client via Docker CLI (`docker exec openclaw openclaw agent`). `chatWithAgent(agent, sessionId, message)` for both Marco and Sofia. Also `buildUserMessage()` (story editing system prompt with date-aware body limits and bullet rules) and `parseResponse()` (extracts JSON field updates from Sofia markdown). |
 | `fetch.ts` | Shared `apiFetch(url, body)` with `Content-Type` + `X-Requested-With: fetch` headers. |
 | `history.ts` | Read/write version history sidecars. Capped at 50 entries per story. |
+| `storyUtils.ts` | Shared story helpers: `applyUpdates()`, `diffFields()`, `storyEqual()`, `COMPARABLE_KEYS`, `FIELD_LABELS`. Used by StoryEditor, StoryChat, and StoryGrid. |
+| `storyChatTracker.ts` | Module-level (outside React) tracker for in-flight story chat requests. Tracks loading state and "updated but unseen" state (persisted to localStorage). Subscribe mechanism for React components. |
+| `chat.ts` | Shared chat helpers: `autoResize()`, `handleChatKeyDown()`, `loadMessages()`, `saveMessages()`, and localStorage key helpers (`storyChatKey`, `storyChatSessionKey`, `agentChatKey`, `agentChatSessionKey`). |
 | `markdown.tsx` | Shared `renderMarkdown()` + `linkSources()` for agent output rendering. Handles headings, bold, links, source+link merging. |
 | `fs.ts` | `fileExists()` utility. |
 | `env.ts` | `requireEnv(name)` — throws if missing. |
@@ -336,23 +344,32 @@ All mutation endpoints require `X-Requested-With: fetch` header (CSRF prevention
 
 ## Background agent requests
 
-Agent chat requests continue even when the drawer is closed:
-- `send()` captures `agent` and `sessionId` in local variables at call time
-- `persistMessages()` accepts explicit agent/sessionId params instead of reading from state
+**AgentChat** (drawer) requests continue even when the drawer is closed:
+- `send()` captures `agent`, `sessionId`, and `date` in local variables at call time
+- `persistMessages()` accepts explicit agent/sessionId/date params instead of reading from state
 - Loading state is owned by HeaderShell (`agentLoading: Record<Agent, boolean>`) and passed down
 - When a request finishes and the drawer isn't showing that agent, `agentUnread` is set
 - Opening the agent drawer clears its unread flag
 
+**StoryChat** (editor) requests continue even when the editor modal is closed:
+- `send()` captures all values in closures; `mountedRef` tracks whether the component is still alive
+- If mounted when response arrives: normal flow (show message, trigger accept/revert via `onUpdate`)
+- If unmounted: auto-saves updates directly via the update API, marks story as updated in `storyChatTracker`, dispatches `stories-changed`
+- `storyChatTracker` (module-level, outside React) tracks loading and "updated but unseen" state
+- StoryGrid subscribes to the tracker: shows spinner while Sofia is thinking, green "Sofia updated" pill (3s fade) when she finishes
+- Opening the editor clears the "unseen" flag
+
 ## Cross-component communication
 
-- **`stories-changed` CustomEvent**: Dispatched by AgentChat after any agent reply. StoryGrid listens and refetches stories + stale status.
+- **`stories-changed` CustomEvent**: Dispatched by AgentChat and StoryChat (on background auto-save) after any agent reply. StoryGrid listens and refetches stories + stale status.
+- **`storyChatTracker` subscription**: StoryGrid subscribes to loading/updated state changes for showing per-card Sofia indicators.
 - **`onSaved` callback**: StoryEditor calls this to update StoryGrid's in-memory stories after a save.
 - **`onLoadingChange` callback**: AgentChat notifies HeaderShell when requests start/end.
 
 ## What's NOT built yet
 
-- Phone frame preview (WIP on `phone-preview` branch, deferred)
+- Reject feedback loop (Sofia learns from rejections)
+- A/B testing for story variants
 - Tinder-style swipe approve/reject on mobile
-- Give Sofia more creative freedom with story visuals
 - Activity logging (agent calls, story changes, logins)
 - Mobile keyboard fix for slide-out panels (iOS pushes content)
