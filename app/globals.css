@@ -51,8 +51,11 @@
   --color-accent-projects:  var(--accent-projects);
   --color-accent-culture:   var(--accent-culture);
   --color-surface:          #111111;
+  --color-surface-2:        #141414;
   --color-border:           #1a1a1a;
+  --color-border-panel:     #1f1f1f;
   --color-border-light:     #222222;
+  --color-border-input:     #2a2a2a;
   --color-border-mid:       #333333;
   --color-muted:            #666666;
   --color-success:          #22c55e;

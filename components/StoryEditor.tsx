@@ -10,7 +10,7 @@ import StoryCard from "./StoryCard";
 import PhonePreview from "./PhonePreview";
 import StoryChat from "./StoryChat";
 import StoryFields from "./StoryFields";
-import VersionTimeline from "./VersionTimeline";
+import HistoryTimeline from "./HistoryTimeline";
 
 interface Props {
   story: Story;
@@ -307,7 +307,7 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
           </div>
 
           {(showHistory || isViewingHistory) && (
-            <VersionTimeline
+            <HistoryTimeline
               entries={history}
               viewingIdx={viewingIdx}
               onSelect={handleViewVersion}

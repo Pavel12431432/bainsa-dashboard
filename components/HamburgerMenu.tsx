@@ -87,7 +87,7 @@ export default function HamburgerMenu({ open, onClose, onOpenAgentOutput, hasDat
                 key={`${r.date}-${r.index}-${i}`}
                 href={`/stories/${r.date}?highlight=${r.index}`}
                 onClick={onClose}
-                className="block px-4 py-2.5 rounded-md text-left no-underline hover:bg-[#1a1a1a] transition-colors duration-150"
+                className="block px-4 py-2.5 rounded-md text-left no-underline hover:bg-border transition-colors duration-150"
               >
                 <span className="block text-xs text-brand-white opacity-70 leading-relaxed truncate">
                   {r.headline}
@@ -102,19 +102,19 @@ export default function HamburgerMenu({ open, onClose, onOpenAgentOutput, hasDat
 
         {/* Divider between search and menu items */}
         {results.length > 0 && (
-          <hr className="border-none border-t border-[#1f1f1f] my-3 mx-6" />
+          <hr className="border-none border-t border-border-panel my-3 mx-6" />
         )}
 
         {/* Navigation */}
         <Link
           href="/"
           onClick={onClose}
-          className="block w-full text-left px-6 py-3 text-[0.75rem] font-semibold text-brand-white opacity-55 hover:opacity-90 hover:bg-[#1a1a1a] transition-opacity duration-150 no-underline"
+          className="block w-full text-left px-6 py-3 text-[0.75rem] font-semibold text-brand-white opacity-55 hover:opacity-90 hover:bg-border transition-opacity duration-150 no-underline"
         >
           Today&apos;s Stories
         </Link>
 
-        <hr className="border-none border-t border-[#1f1f1f] my-3 mx-6" />
+        <hr className="border-none border-t border-border-panel my-3 mx-6" />
 
         {/* Agent outputs — mobile only, stories page only */}
         {hasDate && (
@@ -124,18 +124,18 @@ export default function HamburgerMenu({ open, onClose, onOpenAgentOutput, hasDat
             </p>
             <button
               onClick={() => onOpenAgentOutput("MARCO")}
-              className="w-full text-left px-6 py-3 text-[0.75rem] font-semibold text-brand-white opacity-55 hover:opacity-90 hover:bg-[#1a1a1a] transition-opacity duration-150 bg-transparent border-none cursor-pointer"
+              className="w-full text-left px-6 py-3 text-[0.75rem] font-semibold text-brand-white opacity-55 hover:opacity-90 hover:bg-border transition-opacity duration-150 bg-transparent border-none cursor-pointer"
             >
               Marco Output
             </button>
             <button
               onClick={() => onOpenAgentOutput("SOFIA")}
-              className="w-full text-left px-6 py-3 text-[0.75rem] font-semibold text-brand-white opacity-55 hover:opacity-90 hover:bg-[#1a1a1a] transition-opacity duration-150 bg-transparent border-none cursor-pointer"
+              className="w-full text-left px-6 py-3 text-[0.75rem] font-semibold text-brand-white opacity-55 hover:opacity-90 hover:bg-border transition-opacity duration-150 bg-transparent border-none cursor-pointer"
             >
               Sofia Output
             </button>
 
-            <hr className="border-none border-t border-[#1f1f1f] my-3 mx-6" />
+            <hr className="border-none border-t border-border-panel my-3 mx-6" />
           </div>
         )}
 
@@ -146,17 +146,17 @@ export default function HamburgerMenu({ open, onClose, onOpenAgentOutput, hasDat
         <Link
           href="/teach"
           onClick={onClose}
-          className="block w-full text-left px-6 py-3 text-[0.75rem] font-semibold text-brand-white opacity-55 hover:opacity-90 hover:bg-[#1a1a1a] transition-opacity duration-150 no-underline"
+          className="block w-full text-left px-6 py-3 text-[0.75rem] font-semibold text-brand-white opacity-55 hover:opacity-90 hover:bg-border transition-opacity duration-150 no-underline"
         >
           Teach Sofia
         </Link>
 
-        <hr className="border-none border-t border-[#1f1f1f] my-3 mx-6" />
+        <hr className="border-none border-t border-border-panel my-3 mx-6" />
 
         {/* Logout */}
         <a
           href="/api/auth/logout"
-          className="block w-full text-left px-6 py-3 text-[0.75rem] font-semibold text-brand-white opacity-55 hover:opacity-90 hover:bg-[#1a1a1a] transition-opacity duration-150 no-underline"
+          className="block w-full text-left px-6 py-3 text-[0.75rem] font-semibold text-brand-white opacity-55 hover:opacity-90 hover:bg-border transition-opacity duration-150 no-underline"
         >
           Logout
         </a>

@@ -45,7 +45,7 @@ const GHOST_ACCENTS = [
 ] as const;
 
 const selectClass =
-  "bg-border border border-[#2a2a2a] rounded-[5px] px-3 py-2.5 text-brand-white text-sm outline-none w-full disabled:opacity-50";
+  "bg-border border border-border-input rounded-[5px] px-3 py-2.5 text-brand-white text-sm outline-none w-full disabled:opacity-50";
 
 interface Props {
   draft: Story;
@@ -65,7 +65,7 @@ export default function StoryFields({ draft, onUpdate, disabled }: Props) {
           onChange={(e) => onUpdate("headline", e.target.value)}
           rows={2}
           disabled={disabled}
-          className="bg-border border border-[#2a2a2a] rounded-[5px] px-3 py-2.5 text-brand-white text-sm leading-normal resize-y outline-none disabled:opacity-50"
+          className="bg-border border border-border-input rounded-[5px] px-3 py-2.5 text-brand-white text-sm leading-normal resize-y outline-none disabled:opacity-50"
         />
         <CharCount value={draft.headline} max={80} />
       </Field>
@@ -76,7 +76,7 @@ export default function StoryFields({ draft, onUpdate, disabled }: Props) {
           onChange={(e) => onUpdate("body", e.target.value)}
           rows={4}
           disabled={disabled}
-          className="bg-border border border-[#2a2a2a] rounded-[5px] px-3 py-2.5 text-brand-white text-sm leading-normal resize-y outline-none disabled:opacity-50"
+          className="bg-border border border-border-input rounded-[5px] px-3 py-2.5 text-brand-white text-sm leading-normal resize-y outline-none disabled:opacity-50"
         />
         <CharCount value={draft.body} max={bodyMaxChars(draft.contentType)} />
       </Field>
@@ -87,7 +87,7 @@ export default function StoryFields({ draft, onUpdate, disabled }: Props) {
           value={draft.sourceTag}
           onChange={(e) => onUpdate("sourceTag", e.target.value)}
           disabled={disabled}
-          className="bg-border border border-[#2a2a2a] rounded-[5px] px-3 py-2.5 text-brand-white text-sm outline-none w-full disabled:opacity-50"
+          className="bg-border border border-border-input rounded-[5px] px-3 py-2.5 text-brand-white text-sm outline-none w-full disabled:opacity-50"
         />
       </Field>
 

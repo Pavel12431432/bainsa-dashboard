@@ -1,20 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isValidDate } from "@/lib/date";
 import { chatWithAgent, buildUserMessage, parseResponse } from "@/lib/openclaw";
 import { Story } from "@/types";
+import { requireFetch, validateStoryParams } from "@/lib/apiGuard";
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ date: string; index: string }> },
 ) {
-  if (req.headers.get("x-requested-with") !== "fetch") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const csrf = requireFetch(req);
+  if (csrf) return csrf;
 
   const { date, index } = await params;
-  if (!isValidDate(date) || !/^\d+$/.test(index)) {
-    return NextResponse.json({ error: "Invalid params" }, { status: 400 });
-  }
+  const invalid = validateStoryParams(date, index);
+  if (invalid) return invalid;
 
   const { message, story, sessionId } = (await req.json()) as {
     message: string;

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readInstructionHistory, addInstructionHistory } from "@/lib/instructionHistory";
+import { requireFetch } from "@/lib/apiGuard";
 
 export async function GET() {
   const entries = await readInstructionHistory();
@@ -7,9 +8,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  if (req.headers.get("x-requested-with") !== "fetch") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const csrf = requireFetch(req);
+  if (csrf) return csrf;
 
   const { content, label } = await req.json();
   if (typeof content !== "string" || typeof label !== "string") {

@@ -21,11 +21,11 @@ export default function SlidePanel({ side, open, title, onClose, width, children
 
   return (
     <div
-      className={`fixed top-0 ${position} bottom-0 bg-surface ${border} border-[#1f1f1f] z-50 flex flex-col transition-transform duration-[220ms] ease-out`}
+      className={`fixed top-0 ${position} bottom-0 bg-surface ${border} border-border-panel z-50 flex flex-col transition-transform duration-[220ms] ease-out`}
       style={{ width: w, transform: translate }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-5 border-b border-[#1f1f1f] shrink-0">
+      <div className="flex items-center justify-between px-6 py-5 border-b border-border-panel shrink-0">
         <div className="flex items-center gap-2.5 text-xs font-semibold text-brand-white tracking-[0.08em]">
           {title}
         </div>

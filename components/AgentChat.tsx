@@ -3,9 +3,10 @@
 import { useState, useRef, useEffect } from "react";
 import { ChatMessage } from "@/types";
 import { apiFetch } from "@/lib/fetch";
-import { autoResize, handleChatKeyDown, loadMessages, saveMessages, agentChatKey, agentChatSessionKey } from "@/lib/chat";
+import { loadMessages, saveMessages, agentChatKey, agentChatSessionKey } from "@/lib/chat";
 import { renderMarkdown } from "@/lib/markdown";
 import SlidePanel from "./SlidePanel";
+import ChatMessages from "./ChatMessages";
 
 type Agent = "MARCO" | "SOFIA";
 
@@ -51,7 +52,6 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
   const [input, setInput] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const isLoading = agent ? agentLoading[agent] : false;
-  const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const loaded = useRef(false);
   const dragging = useRef(false);
@@ -95,15 +95,6 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
   // Auto-scroll — instant on agent switch, smooth during conversation
   const switching = useRef(false);
   useEffect(() => { switching.current = true; }, [agent]);
-  useEffect(() => {
-    if (switching.current) {
-      bottomRef.current?.scrollIntoView({ behavior: "instant" });
-      switching.current = false;
-    } else {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages, isLoading]);
-
 
   async function send() {
     const text = input.trim();
@@ -246,7 +237,7 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
           <div className="shrink-0">
             <button
               onClick={() => setExpanded(!expanded)}
-              className="w-full flex items-center justify-between px-6 py-3 bg-[#141414] text-left border-none cursor-pointer border-b border-[#1f1f1f]"
+              className="w-full flex items-center justify-between px-6 py-3 bg-surface-2 text-left border-none cursor-pointer border-b border-border-panel"
             >
               <span className="text-[0.7rem] font-semibold text-brand-white opacity-55">
                 Output · {current.count} {label}
@@ -258,7 +249,7 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
             {expanded && (
               <>
                 <div
-                  className="overflow-y-auto px-6 py-4 bg-[#141414]"
+                  className="overflow-y-auto px-6 py-4 bg-surface-2"
                   style={{ height: outputHeight }}
                 >
                   {renderMarkdown(current.content)}
@@ -267,7 +258,7 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
                 <div
                   onMouseDown={onDragStart}
                   onTouchStart={onDragStart}
-                  className="h-2 bg-[#141414] border-b border-[#1f1f1f] cursor-row-resize flex items-center justify-center shrink-0"
+                  className="h-2 bg-surface-2 border-b border-border-panel cursor-row-resize flex items-center justify-center shrink-0"
                 >
                   <div className="w-8 h-[3px] rounded-full bg-border-mid" />
                 </div>
@@ -276,9 +267,16 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
           </div>
         )}
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3 min-h-0">
-          {messages.length === 0 && !isLoading && (
+        <ChatMessages
+          messages={messages}
+          input={input}
+          onInputChange={setInput}
+          onSend={send}
+          loading={isLoading}
+          placeholder={`Ask ${agent === "MARCO" ? "Marco" : "Sofia"}...`}
+          loadingText={`${agent === "MARCO" ? "Marco" : "Sofia"} is thinking...`}
+          inputRef={inputRef}
+          emptyState={
             <p className="text-xs text-muted text-center mt-8 leading-relaxed">
               {agent === "MARCO"
                 ? "Ask Marco about today's news."
@@ -290,60 +288,18 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
                   : 'e.g. "make all headlines shorter" or "regenerate stories"'}
               </span>
             </p>
-          )}
-
-          {messages.map((msg, i) => (
-            <div
-              key={i}
-              className={`max-w-[85%] rounded-lg px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap ${
-                msg.role === "user"
-                  ? "self-end bg-border-light text-brand-white"
-                  : "self-start bg-border text-brand-white opacity-80"
-              }`}
-            >
-              {msg.content}
-            </div>
-          ))}
-
-          {isLoading && (
-            <div className="self-start bg-border rounded-lg px-3 py-2 text-xs text-muted animate-pulse">
-              {agent === "MARCO" ? "Marco" : "Sofia"} is thinking...
-            </div>
-          )}
-
-          <div ref={bottomRef} />
-        </div>
-
-        {/* Input */}
-        <div className="px-4 py-3 border-t border-[#1f1f1f] shrink-0">
-          <div className="flex gap-2 items-end">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => { setInput(e.target.value); autoResize(inputRef.current); }}
-              onKeyDown={(e) => handleChatKeyDown(e, send)}
-              placeholder={`Ask ${agent === "MARCO" ? "Marco" : "Sofia"}...`}
-              rows={1}
-              className="flex-1 bg-border border border-border-mid rounded-md px-3 py-2 text-xs text-brand-white resize-none outline-none overflow-y-auto"
-              style={{ maxHeight: 120 }}
-            />
-            <button
-              onClick={send}
-              disabled={!input.trim() || isLoading}
-              className="px-3 py-2 rounded-md text-xs font-semibold shrink-0 bg-brand-white text-brand-black disabled:bg-border-mid disabled:text-muted disabled:cursor-not-allowed cursor-pointer"
-            >
-              Send
-            </button>
-          </div>
-          {messages.length > 0 && (
-            <button
-              onClick={reset}
-              className="mt-2 text-[0.6rem] font-semibold text-muted tracking-[0.04em] bg-transparent border-none cursor-pointer hover:text-brand-white"
-            >
-              RESET CHAT
-            </button>
-          )}
-        </div>
+          }
+          footer={
+            messages.length > 0 ? (
+              <button
+                onClick={reset}
+                className="mt-2 text-[0.6rem] font-semibold text-muted tracking-[0.04em] bg-transparent border-none cursor-pointer hover:text-brand-white"
+              >
+                RESET CHAT
+              </button>
+            ) : undefined
+          }
+        />
       </div>
     </SlidePanel>
   );

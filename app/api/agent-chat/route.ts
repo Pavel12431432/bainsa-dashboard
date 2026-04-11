@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { chatWithAgent, AgentId } from "@/lib/openclaw";
+import { requireFetch } from "@/lib/apiGuard";
 
 export async function POST(req: NextRequest) {
-  if (req.headers.get("x-requested-with") !== "fetch") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const csrf = requireFetch(req);
+  if (csrf) return csrf;
 
   const { agent, message, sessionId, newSession } = await req.json();
 
