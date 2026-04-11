@@ -105,12 +105,14 @@ The dashboard compares Marco's and Sofia's `lastRun` timestamps. If Marco ran af
 
 ### Agent behavior changes
 
-Sofia's output is controlled by three files in `~/openclaw/workspace/story-generator/`:
-- **SOUL.md** — core instructions, output format, division definitions, brand rules, tone
+Sofia's output is controlled by these files in `~/openclaw/workspace/story-generator/`:
+- **SOUL.md** — entry point (OpenClaw reads this). Just references FIXED.md and ADAPTIVE.md.
+- **FIXED.md** — output format, division definitions, brand rules, character limits, hard constraints. Never changes.
+- **ADAPTIVE.md** — style preferences, tone, copy guidelines, good/bad examples. Evolves based on human feedback (will be rewritten by an editor agent in the future).
 - **USER.md** — BAINSA-specific context: divisions with accent colors, audience description, workflow
 - **memory/YYYY-MM-DD.md** — Sofia's own notes about decisions she made (read-only, don't edit)
 
-**If Sofia generates wrong colors or divisions**, check USER.md first — it often overrides SOUL.md.
+**If Sofia generates wrong colors or divisions**, check USER.md first — it often overrides SOUL.md/FIXED.md.
 
 ### Division system
 
