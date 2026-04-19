@@ -1,5 +1,7 @@
 import { execFile } from "child_process";
 import { Story } from "@/types";
+import { VARIANT_FIELDS } from "@/lib/storyUtils";
+import type { NewVariant } from "@/lib/variants";
 
 const AGENT_CLI_NAMES = { marco: "news-researcher", sofia: "story-generator" } as const;
 export type AgentId = keyof typeof AGENT_CLI_NAMES;
@@ -74,6 +76,62 @@ export function chatWithAgent(
         }
       },
     );
+  });
+}
+
+export function buildVariantsMessage(story: Story, count: number): string {
+  const bodyMax = story.contentType === "text" ? 300 : 200;
+  return `You are generating ${count} alternative versions of a BAINSA Instagram story card.
+
+Fixed (do NOT change): division="${story.division}", accentColor="${story.accentColor}", sourceTag="${story.sourceTag}". Keep facts accurate.
+
+Vary both COPY (headline, body) and DESIGN (layout, content type, headline size, body weight, text align, corner size, accent bar, ghost accent, corner accent). Each variant should feel distinctly different in angle/energy/voice and visual treatment.
+
+Field values:
+- layout: "top" | "center" | "bottom"
+- contentType: "text" | "bullets" | "quote"
+- headlineSize: "large" | "default" | "compact"
+- bodyWeight: "regular" | "semibold"
+- textAlign: "left" | "justify"
+- cornerSize: "small" | "medium"
+- accentBar: "bottom" | "top" | "none"
+- ghostAccent: "none" | "bottom-right" | "center" | "top-left"
+- cornerAccent: ">" | "+"
+
+Limits: headline max 80 chars. Body max: text=300, bullets=200, quote=200. For bullets, each bullet line starts with "> ", sentence case, 2-3 bullets, 5-10 words each.
+
+Current story (#${story.index}):
+Headline: "${story.headline}"
+Body (${story.body.length}/${bodyMax}): "${story.body}"
+Division: ${story.division}
+Layout: ${story.layout} | Content type: ${story.contentType} | Headline size: ${story.headlineSize} | Body weight: ${story.bodyWeight} | Text align: ${story.textAlign} | Corner size: ${story.cornerSize} | Accent bar: ${story.accentBar} | Ghost accent: ${story.ghostAccent} | Corner accent: ${story.cornerAccent}
+
+Respond with ONLY a JSON code block of this exact shape:
+\`\`\`json
+{ "variants": [
+  { "headline": "...", "body": "...", "contentType": "...", "layout": "...", "headlineSize": "...", "bodyWeight": "...", "textAlign": "...", "cornerSize": "...", "accentBar": "...", "ghostAccent": "...", "cornerAccent": "..." }
+] }
+\`\`\`
+Include exactly ${count} variants. No commentary outside the JSON block.`;
+}
+
+export function parseVariantsResponse(content: string): NewVariant[] {
+  const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
+  if (!jsonMatch) throw new Error("No JSON block in Sofia response");
+  const parsed = JSON.parse(jsonMatch[1]);
+  const list = parsed?.variants;
+  if (!Array.isArray(list) || list.length === 0) {
+    throw new Error("Response has no variants array");
+  }
+  return list.map((v, i) => {
+    for (const k of VARIANT_FIELDS) {
+      if (typeof v?.[k] !== "string") {
+        throw new Error(`Variant ${i} missing field: ${k}`);
+      }
+    }
+    const out = {} as Record<string, string>;
+    for (const k of VARIANT_FIELDS) out[k] = v[k];
+    return out as unknown as NewVariant;
   });
 }
 

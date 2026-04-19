@@ -8,9 +8,13 @@ import { applyUpdates, diffFields, storyEqual, FIELD_LABELS } from "@/lib/storyU
 import { storyChatSessionKey } from "@/lib/chat";
 import StoryCard from "./StoryCard";
 import PhonePreview from "./PhonePreview";
+import PreviewPanel from "./PreviewPanel";
 import StoryChat from "./StoryChat";
 import StoryFields from "./StoryFields";
 import HistoryTimeline from "./HistoryTimeline";
+import ExploreView from "./ExploreView";
+import { Variant, ApplyMode } from "@/lib/variants";
+import { variantToPatch } from "@/lib/storyUtils";
 
 interface Props {
   story: Story;
@@ -24,6 +28,8 @@ interface Pending {
   before: Story;
   after: Story;
   changedFields: string[];
+  source: "chat" | "variant";
+  variantMode?: "all" | "text" | "design";
 }
 
 function getSessionId(date: string, index: number): string {
@@ -56,7 +62,13 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  const [fullscreenStory, setFullscreenStory] = useState<Story | null>(null);
   const [viewingIdx, setViewingIdx] = useState<number | null>(null);
+  const [mode, setMode] = useState<"editor" | "explore">("editor");
+  const [variants, setVariants] = useState<Variant[]>([]);
+  const [variantsLoaded, setVariantsLoaded] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [variantsError, setVariantsError] = useState("");
 
   const saved = useRef<Story>({ ...story });
   const currentBeforeViewing = useRef<Story>({ ...story });
@@ -80,7 +92,7 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
     if (viewingIdx !== null) return;
     const changedFields = diffFields(before, story);
     if (changedFields.length === 0) return;
-    setPending({ before, after: story, changedFields });
+    setPending({ before, after: story, changedFields, source: "chat" });
     setDraft({ ...story });
     saved.current = { ...story };
     // Refresh history (auto-save path already recorded it)
@@ -135,18 +147,78 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
     });
   }
 
-  async function handleChatUpdate(updates: Partial<Story>) {
+  async function applyUpdatesWithLabel(
+    updates: Partial<Story>,
+    labelFn: (fields: string[]) => string,
+    source: "chat" | "variant" = "chat",
+    variantMode?: "all" | "text" | "design",
+  ) {
     const before = { ...draft };
     const after = applyUpdates(before, updates);
     const changedFields = diffFields(before, after);
     if (changedFields.length === 0) return;
-    setPending({ before, after, changedFields });
+    setPending({ before, after, changedFields, source, variantMode });
     setDraft(after);
-    // Auto-save immediately
-    const changedLabel = changedFields.map((f) => FIELD_LABELS[f] ?? f).join(", ");
     if (await saveStory(after)) {
-      await recordHistory(after, `Sofia: ${changedLabel}`);
+      await recordHistory(after, labelFn(changedFields));
     }
+  }
+
+  async function handleChatUpdate(updates: Partial<Story>) {
+    await applyUpdatesWithLabel(updates, (fields) =>
+      `Sofia: ${fields.map((f) => FIELD_LABELS[f] ?? f).join(", ")}`,
+    );
+  }
+
+  const variantsUrl = `/api/stories/${date}/${story.index}/variants`;
+
+  useEffect(() => {
+    if (mode !== "explore" || variantsLoaded) return;
+    fetch(variantsUrl)
+      .then((r) => r.json())
+      .then((data: { variants: Variant[] }) => {
+        setVariants(data.variants ?? []);
+        setVariantsLoaded(true);
+      })
+      .catch(() => setVariantsLoaded(true));
+  }, [mode, variantsLoaded, variantsUrl]);
+
+  async function handleGenerateVariants() {
+    setGenerating(true);
+    setVariantsError("");
+    try {
+      const res = await apiFetch(variantsUrl, {});
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Generation failed");
+      setVariants(data.variants ?? []);
+    } catch (err) {
+      setVariantsError(err instanceof Error ? err.message : "Generation failed");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function handleApplyVariant(variant: Variant, applyMode: ApplyMode) {
+    const patch = variantToPatch(variant, applyMode);
+    await applyUpdatesWithLabel(patch, () => `Variant applied (${applyMode})`, "variant", applyMode);
+    try {
+      const res = await apiFetch(`${variantsUrl}/${variant.id}`, {
+        action: "apply",
+        mode: applyMode,
+      });
+      const data = await res.json();
+      if (res.ok && data.variants) setVariants(data.variants);
+    } catch {}
+  }
+
+  async function handleDislikeVariant(variant: Variant, disliked: boolean) {
+    try {
+      const res = await apiFetch(`${variantsUrl}/${variant.id}`, {
+        action: disliked ? "dislike" : "undislike",
+      });
+      const data = await res.json();
+      if (res.ok && data.variants) setVariants(data.variants);
+    } catch {}
   }
 
   async function handleRevert() {
@@ -212,51 +284,102 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-surface border border-border-light rounded-xl flex w-full max-w-[1200px] max-h-[90vh] overflow-hidden max-md:flex-col max-md:max-w-none max-md:max-h-none max-md:h-full max-md:rounded-none max-md:border-none"
+        className="bg-surface border border-border-light rounded-xl flex flex-col w-full max-w-[1200px] max-h-[85vh] overflow-hidden max-md:max-w-none max-md:max-h-none max-md:h-full max-md:rounded-none max-md:border-none"
       >
-        {/* Preview — hidden below lg, fixed-size container so toggling doesn't shift layout */}
-        <div className="p-8 bg-brand-black flex flex-col items-center justify-center shrink-0 border-r border-border max-lg:hidden gap-4">
-          <div className="flex items-center justify-center" style={{ width: 294, height: 521 }}>
-            <div className="group/preview relative cursor-pointer" onClick={() => setFullscreen(true)}>
-              {preview === "card" ? (
-                <StoryCard story={draft} scale={0.72} />
-              ) : (
-                <PhonePreview story={draft} scale={0.58} />
-              )}
-              <button
-                onClick={() => setFullscreen(true)}
-                className="absolute top-2 right-2 p-1.5 rounded-md bg-black/50 border-none cursor-pointer opacity-0 group-hover/preview:opacity-60 hover:!opacity-100 transition-opacity duration-150"
-                style={{ zIndex: 30 }}
-                title="Fullscreen preview"
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="9 1 13 1 13 5" />
-                  <polyline points="5 13 1 13 1 9" />
-                  <line x1="13" y1="1" x2="8.5" y2="5.5" />
-                  <line x1="1" y1="13" x2="5.5" y2="8.5" />
-                </svg>
-              </button>
-            </div>
-          </div>
-          <div className="flex gap-1 bg-surface rounded-lg p-1">
+        {/* Top bar with EDITOR/EXPLORE toggle */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border-light shrink-0">
+          <div className="flex gap-1 bg-border rounded-md p-1">
             <button
-              onClick={() => setPreview("card")}
-              className={`px-3 py-1.5 rounded-md text-[0.6rem] font-semibold tracking-[0.06em] border-none cursor-pointer transition-colors duration-150 ${
-                preview === "card" ? "bg-border-mid text-brand-white" : "bg-transparent text-muted hover:text-brand-white"
+              onClick={() => setMode("editor")}
+              className={`px-3 py-1.5 rounded text-[0.6rem] font-semibold tracking-[0.08em] border-none cursor-pointer transition-colors ${
+                mode === "editor" ? "bg-border-mid text-brand-white" : "bg-transparent text-muted hover:text-brand-white"
               }`}
             >
-              CARD
+              EDITOR
             </button>
             <button
-              onClick={() => setPreview("phone")}
-              className={`px-3 py-1.5 rounded-md text-[0.6rem] font-semibold tracking-[0.06em] border-none cursor-pointer transition-colors duration-150 ${
-                preview === "phone" ? "bg-border-mid text-brand-white" : "bg-transparent text-muted hover:text-brand-white"
+              onClick={() => setMode("explore")}
+              className={`px-3 py-1.5 rounded text-[0.6rem] font-semibold tracking-[0.08em] border-none cursor-pointer transition-colors ${
+                mode === "explore" ? "bg-border-mid text-brand-white" : "bg-transparent text-muted hover:text-brand-white"
               }`}
             >
-              PHONE
+              EXPLORE
             </button>
           </div>
+          <button
+            onClick={onClose}
+            className="bg-transparent border-none text-muted cursor-pointer text-xl leading-none p-0"
+          >
+            ✕
+          </button>
         </div>
+
+        {pending && (
+          <div className="flex flex-col gap-2 px-4 py-2.5 border-b border-border-light bg-surface-2 shrink-0">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[0.7rem] text-brand-white opacity-70 m-0">
+                {pending.source === "variant"
+                  ? `Variant applied${pending.variantMode && pending.variantMode !== "all" ? ` (${pending.variantMode} only)` : ""}`
+                  : `Sofia changed ${pending.changedFields.map((f) => FIELD_LABELS[f] ?? f).join(", ")}`}
+              </p>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  onClick={handleRevert}
+                  className="text-[0.65rem] font-semibold text-muted bg-transparent border border-border-mid rounded px-2.5 py-1 cursor-pointer hover:text-danger hover:border-danger/30"
+                >
+                  REVERT
+                </button>
+                <button
+                  onClick={() => setPending(null)}
+                  className="text-[0.65rem] font-semibold text-muted bg-transparent border border-border-mid rounded px-2.5 py-1 cursor-pointer hover:text-brand-white"
+                >
+                  DISMISS
+                </button>
+              </div>
+            </div>
+            {pending.source === "chat" && (
+              <div className="flex flex-col gap-1">
+                {pending.changedFields.map((f) => {
+                  const old = (pending.before as unknown as Record<string, string>)[f] ?? "";
+                  const now = (pending.after as unknown as Record<string, string>)[f] ?? "";
+                  return (
+                    <div key={f} className="text-[0.65rem] leading-relaxed">
+                      <span className="text-muted font-semibold uppercase tracking-[0.04em]">{FIELD_LABELS[f] ?? f}: </span>
+                      <span className="text-danger/70 line-through">{old}</span>
+                      <span className="text-muted mx-1">→</span>
+                      <span className="text-success/90">{now}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {mode === "explore" ? (
+          <ExploreView
+            baseStory={draft}
+            variants={variants}
+            generating={generating}
+            error={variantsError}
+            onGenerate={handleGenerateVariants}
+            onApply={handleApplyVariant}
+            onDislike={handleDislikeVariant}
+            preview={preview}
+            onPreviewChange={setPreview}
+            onFullscreen={(s: Story) => {
+              setFullscreenStory(storyEqual(s, draft) ? null : s);
+              setFullscreen(true);
+            }}
+          />
+        ) : (
+        <div className="flex flex-1 overflow-hidden max-md:flex-col">
+        <PreviewPanel
+          story={draft}
+          preview={preview}
+          onPreviewChange={setPreview}
+          onFullscreen={() => { setFullscreenStory(null); setFullscreen(true); }}
+        />
 
         {/* Mobile tab bar */}
         <div className="hidden max-md:flex items-center border-b border-border-light shrink-0">
@@ -272,12 +395,6 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
           >
             SOFIA
           </button>
-          <button
-            onClick={onClose}
-            className="bg-transparent border-none text-muted cursor-pointer text-lg px-4 py-2"
-          >
-            ✕
-          </button>
         </div>
 
         {/* Form */}
@@ -288,22 +405,14 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
             <h2 className="text-sm font-semibold text-brand-white m-0 tracking-[0.06em]">
               EDIT STORY {draft.index}
             </h2>
-            <div className="flex items-center gap-3">
-              {history.length > 0 && !isViewingHistory && (
-                <button
-                  onClick={() => setShowHistory((v) => !v)}
-                  className="text-[0.65rem] font-semibold text-muted tracking-[0.04em] bg-transparent border-none cursor-pointer hover:text-brand-white"
-                >
-                  {showHistory ? "HIDE HISTORY" : `HISTORY (${history.length})`}
-                </button>
-              )}
+            {history.length > 0 && !isViewingHistory && (
               <button
-                onClick={onClose}
-                className="bg-transparent border-none text-muted cursor-pointer text-xl leading-none p-0 max-md:hidden"
+                onClick={() => setShowHistory((v) => !v)}
+                className="text-[0.65rem] font-semibold text-muted tracking-[0.04em] bg-transparent border-none cursor-pointer hover:text-brand-white"
               >
-                ✕
+                {showHistory ? "HIDE HISTORY" : `HISTORY (${history.length})`}
               </button>
-            </div>
+            )}
           </div>
 
           {(showHistory || isViewingHistory) && (
@@ -314,45 +423,6 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
               onRestore={handleRestoreVersion}
               onBack={handleBackToCurrent}
             />
-          )}
-
-          {pending && (
-            <div className="flex flex-col gap-2 px-3.5 py-2.5 rounded-lg border border-border-mid bg-border">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-[0.7rem] text-brand-white opacity-70 m-0">
-                  Sofia changed{" "}
-                  {pending.changedFields.map((f) => FIELD_LABELS[f] ?? f).join(", ")}
-                </p>
-                <div className="flex gap-2 shrink-0">
-                  <button
-                    onClick={() => setPending(null)}
-                    className="text-[0.65rem] font-semibold text-muted bg-transparent border border-border-mid rounded px-2.5 py-1 cursor-pointer hover:text-brand-white"
-                  >
-                    OK
-                  </button>
-                  <button
-                    onClick={handleRevert}
-                    className="text-[0.65rem] font-semibold text-muted bg-transparent border border-border-mid rounded px-2.5 py-1 cursor-pointer hover:text-danger hover:border-danger/30"
-                  >
-                    REVERT
-                  </button>
-                </div>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                {pending.changedFields.map((f) => {
-                  const old = (pending.before as unknown as Record<string, string>)[f] ?? "";
-                  const now = (pending.after as unknown as Record<string, string>)[f] ?? "";
-                  return (
-                    <div key={f} className="text-[0.65rem] leading-relaxed">
-                      <span className="text-muted font-semibold uppercase tracking-[0.04em]">{FIELD_LABELS[f] ?? f}: </span>
-                      <span className="text-danger/70 line-through">{old}</span>
-                      <span className="text-muted mx-1">→</span>
-                      <span className="text-success/90">{now}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
           )}
 
           <StoryFields draft={draft} onUpdate={update} disabled={isViewingHistory} />
@@ -395,23 +465,25 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
             />
           </div>
         )}
+        </div>
+        )}
       </div>
 
       {/* Fullscreen preview overlay */}
       {fullscreen && (
         <div
-          onClick={(e) => { e.stopPropagation(); setFullscreen(false); }}
+          onClick={(e) => { e.stopPropagation(); setFullscreen(false); setFullscreenStory(null); }}
           className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center cursor-pointer"
         >
           <div onClick={(e) => e.stopPropagation()} className="cursor-default">
             {preview === "card" ? (
-              <StoryCard story={draft} scale={1} />
+              <StoryCard story={fullscreenStory ?? draft} scale={1} />
             ) : (
-              <PhonePreview story={draft} scale={0.85} />
+              <PhonePreview story={fullscreenStory ?? draft} scale={0.85} />
             )}
           </div>
           <button
-            onClick={() => setFullscreen(false)}
+            onClick={() => { setFullscreen(false); setFullscreenStory(null); }}
             className="absolute top-6 right-6 bg-transparent border-none cursor-pointer text-white/60 hover:text-white transition-colors duration-150"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
