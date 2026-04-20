@@ -34,6 +34,9 @@ yarn-error.log*
 .env*
 !.env.example
 
+# local editor/agent config
+.mcp.json
+
 # sample data runtime mutations (teammates running locally)
 /samples/stories/*.approved.json
 /samples/stories/*.history.json
