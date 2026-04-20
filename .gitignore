@@ -32,6 +32,12 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# sample data runtime mutations (teammates running locally)
+/samples/stories/*.approved.json
+/samples/stories/*.history.json
+/samples/instructions/ADAPTIVE.history.json
 
 # vercel
 .vercel

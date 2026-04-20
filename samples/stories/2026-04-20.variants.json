@@ -1,0 +1,54 @@
+{
+  "2": [
+    {
+      "headline": "Robots are moving from demos to payroll",
+      "body": "Two-thirds of organizations now rank physical AI as a top priority. The next labor gap may be filled by machines that can actually do the work.",
+      "contentType": "text",
+      "layout": "top",
+      "headlineSize": "default",
+      "bodyWeight": "regular",
+      "textAlign": "left",
+      "cornerSize": "small",
+      "accentBar": "bottom",
+      "ghostAccent": "none",
+      "cornerAccent": ">",
+      "id": "husqd4gv",
+      "batchId": "qxmpogtk",
+      "generatedAt": "2026-04-20T18:56:22.160Z"
+    },
+    {
+      "headline": "The factory floor is getting an AI upgrade",
+      "body": "> Autonomous robots are now a boardroom priority\n> Humanoids are still years away\n> Real gains start with existing machines",
+      "contentType": "bullets",
+      "layout": "bottom",
+      "headlineSize": "compact",
+      "bodyWeight": "semibold",
+      "textAlign": "left",
+      "cornerSize": "medium",
+      "accentBar": "top",
+      "ghostAccent": "top-left",
+      "cornerAccent": "+",
+      "id": "nf11re24",
+      "batchId": "qxmpogtk",
+      "generatedAt": "2026-04-20T18:56:22.160Z"
+    },
+    {
+      "headline": "Physical AI is no longer a side project",
+      "body": "66% of organizations are prioritizing autonomous robots to tackle labor shortages and unlock new industrial capabilities.",
+      "contentType": "quote",
+      "layout": "center",
+      "headlineSize": "large",
+      "bodyWeight": "semibold",
+      "textAlign": "justify",
+      "cornerSize": "small",
+      "accentBar": "none",
+      "ghostAccent": "center",
+      "cornerAccent": ">",
+      "id": "rzpstz4u",
+      "batchId": "qxmpogtk",
+      "generatedAt": "2026-04-20T18:56:22.160Z",
+      "appliedAt": "2026-04-20T18:56:39.237Z",
+      "appliedMode": "all"
+    }
+  ]
+}

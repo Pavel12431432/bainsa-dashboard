@@ -1,4 +1,6 @@
 import { execFile } from "child_process";
+import { utimes } from "fs/promises";
+import path from "path";
 import { Story } from "@/types";
 import { VARIANT_FIELDS } from "@/lib/storyUtils";
 import type { NewVariant } from "@/lib/variants";
@@ -42,11 +44,46 @@ Ghost accent: ${story.ghostAccent}
 User: ${instruction}`;
 }
 
+function demoResponse(agent: AgentId, message: string): string {
+  // Variants generation — message comes from buildVariantsMessage()
+  if (message.includes("alternative versions of a BAINSA")) {
+    const countMatch = message.match(/generating (\d+) alternative/);
+    const count = countMatch ? parseInt(countMatch[1], 10) : 3;
+    const templates = [
+      { headline: "Demo variant: punchier angle on the story", body: "Shorter, sharper take that leads with the outcome and trims qualifiers for scroll-stopping impact.", contentType: "text", layout: "top", headlineSize: "large", bodyWeight: "regular", textAlign: "left", cornerSize: "small", accentBar: "bottom", ghostAccent: "bottom-right", cornerAccent: ">" },
+      { headline: "Demo variant: bullet breakdown of the key points", body: "> First concrete takeaway from the news\n> Second point that adds useful context\n> Third point tying it back to AI", contentType: "bullets", layout: "center", headlineSize: "default", bodyWeight: "semibold", textAlign: "left", cornerSize: "medium", accentBar: "top", ghostAccent: "none", cornerAccent: "+" },
+      { headline: "Demo variant: quote-forward treatment", body: "A short, memorable line that could plausibly have been said by someone central to the story.", contentType: "quote", layout: "bottom", headlineSize: "compact", bodyWeight: "regular", textAlign: "justify", cornerSize: "small", accentBar: "none", ghostAccent: "center", cornerAccent: ">" },
+    ];
+    const variants = Array.from({ length: count }, (_, i) => templates[i % templates.length]);
+    return "Here are the alternative versions.\n\n```json\n" + JSON.stringify({ variants }, null, 2) + "\n```";
+  }
+  // Inline edit chat — message comes from buildUserMessage()
+  if (message.includes("editing a BAINSA Instagram story card")) {
+    return "Demo mode: here's a small tweak to the headline.\n\n```json\n" + JSON.stringify({ headline: "Demo edit — Sofia would rewrite this in production" }) + "\n```";
+  }
+  // Regenerate / reconcile — bump mtime on the stories file so the stale banner clears
+  const reconcileMatch = message.match(/stories\/(\d{4}-\d{2}-\d{2})\.md/);
+  if (reconcileMatch && process.env.STORIES_PATH) {
+    const storyFile = path.join(process.env.STORIES_PATH, `${reconcileMatch[1]}.md`);
+    const now = new Date();
+    utimes(storyFile, now, now).catch(() => {});
+    return `Demo mode: reviewed Marco's handoff for ${reconcileMatch[1]}. No new items to reconcile — existing stories are up to date.`;
+  }
+  // Free-form agent drawer chat
+  const who = agent === "marco" ? "Marco" : "Sofia";
+  return `**Demo mode** — ${who} isn't actually running. In production I'd respond to:\n\n> ${message.slice(0, 200)}${message.length > 200 ? "…" : ""}\n\nSet \`DEMO_MODE=false\` and configure OpenClaw to get real agent responses.`;
+}
+
 export function chatWithAgent(
   agent: AgentId,
   sessionId: string,
   message: string,
 ): Promise<string> {
+  if (process.env.DEMO_MODE === "true") {
+    return new Promise((resolve) => {
+      setTimeout(() => resolve(demoResponse(agent, message)), 600);
+    });
+  }
   return new Promise((resolve, reject) => {
     execFile(
       "docker",
