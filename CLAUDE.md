@@ -393,43 +393,10 @@ Defined in `globals.css` as CSS vars + Tailwind `@theme inline`:
 
 All mutation endpoints require `X-Requested-With: fetch` header (CSRF prevention). Date params validated with `isValidDate()` regex (path traversal prevention).
 
-## Background agent requests
-
-**AgentChat** (drawer) requests continue across drawer close AND date navigation:
-- `send()` captures `agent`, `sessionId`, and `date` in local variables at call time
-- `persistMessages()` accepts explicit agent/sessionId/date params instead of reading from state
-- Loading/unread state lives in `agentChatTracker` (module-level, outside React) keyed by `(date, agent)`. HeaderShell and AgentChat both subscribe via `useSyncExternalStore`.
-- `send()` calls `markLoading(date, agent)` / `clearLoading(date, agent)`. On completion, if `isActiveView(date, agent)` is false, calls `markUnread(date, agent)` so the header button shows a dot.
-- AgentChat maintains `setActiveView` while the drawer is open for that agent/date; clears it on close.
-- Opening the agent drawer calls `clearUnread(date, agent)`.
-- Unread flag persists to localStorage (`"agent-chat-unread"` key).
-
-**Regenerate (stale banner)** requests also survive date navigation AND the Next.js Router Cache:
-- `regenerate()` in StoryGrid calls `markRegenerating(date)` before fetching `/api/agent-chat` and `clearRegenerating(date)` in finally.
-- Spinner on the Regenerate button reads `isRegenerating(date)` — unaffected by unmount.
-- On success, `markRegenerated(date)` sets a "file newer than cache" flag. A mount-time `useEffect` in StoryGrid checks `isRegenerated(date)` and, if true, calls `refreshStories()` (which hits the API, bypassing the Router Cache) then `clearRegenerated(date)`. This is how returning to the regen date after navigation shows fresh stories — the RSC cache is stale, but the flag forces a client-side API refetch.
-
-**StoryChat** (editor) requests continue even when the editor modal is closed:
-- `send()` captures all values in closures; `mountedRef` tracks whether the component is still alive
-- If mounted when response arrives: normal flow (show message, trigger OK/revert via `onUpdate`)
-- If unmounted: auto-saves updates directly via the update API, marks story as updated in `storyChatTracker`, dispatches `stories-changed`
-- `storyChatTracker` (module-level, outside React) tracks loading and "updated but unseen" state
-- StoryGrid subscribes via `useSyncExternalStore`: shows spinner while Sofia is thinking, green "Sofia updated" pill (3s fade) when she finishes
-- When `stories-changed` fires, StoryGrid updates both `stories` and `editing` state so the open editor receives the new story via prop
-- StoryEditor detects external story prop changes and shows the pending diff banner (OK/REVERT)
-- StoryChat subscribes to tracker and reloads messages from localStorage when loading clears, so Sofia's reply appears if the editor was re-opened mid-request
-- Opening the editor clears the "unseen" flag
-
 ## Cross-component communication
 
 - **`stories-changed` CustomEvent**: Dispatched by AgentChat, StoryChat (on background auto-save), and StoryGrid's regenerate after any agent reply. StoryGrid listens and refetches stories + stale status.
-- **Trackers + `useSyncExternalStore`** (`agentTracker.ts` factory): Four trackers live outside React — `storyChatTracker` (per-story Sofia chat), `agentChatTracker` (per-drawer agent chat), `variantsTracker` (per-story variant generation), `regenerateTracker` (per-date stale-banner regen). Components subscribe to get loading/changed state that survives unmount and date navigation.
+- **Trackers + `useSyncExternalStore`** (`agentTracker.ts` factory): Four module-level trackers keep loading/unread/changed state alive across unmount and date navigation — `storyChatTracker`, `agentChatTracker`, `variantsTracker`, `regenerateTracker`. Each request captures its context (date, agent, sessionId) in closures so it completes cleanly even if the component unmounts; on unmount-mid-request, StoryChat auto-saves via the update API and sets the tracker's "changed" flag. See individual tracker files for the exact marker/key semantics — don't duplicate them here.
 - **`editing` state update**: StoryGrid updates `editing` when stories refresh, so StoryEditor receives background changes via prop. StoryEditor detects prop changes and shows the diff banner.
 - **`onSaved` callback**: StoryEditor calls this to update StoryGrid's in-memory stories after a save.
 
-## What's NOT built yet
-
-- Editor agent (GPT-5.4 via OpenClaw) to distill approved/rejected stories with feedback into ADAPTIVE.md improvements — feedback collection and teach page are done, agent integration is not
-- Tinder-style swipe approve/reject on mobile
-- Activity logging (agent calls, story changes, logins)
-- Mobile keyboard fix for slide-out panels (iOS pushes content)
