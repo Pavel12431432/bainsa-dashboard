@@ -1,6 +1,6 @@
 # BAINSA Dashboard — Codebase Reference
 
-Read this file instead of exploring the codebase. It is complete and up-to-date as of 2026-04-19.
+Read this file instead of exploring the codebase. It is complete and up-to-date as of 2026-04-20.
 
 ## What this is
 
@@ -43,6 +43,7 @@ GitHub: `Pavel12431432/bainsa-dashboard` (private).
 - **Story markdown format changed**: Sofia now writes `## Story N` (no colon, no title). Both `parseStories.ts` and `serializeStories.ts` must match this format. The old format was `## Story N: Title`.
 - **Field regex**: `extractField()` in `parseStories.ts` uses `[ \t]*` (not `\s*`) after the colon to avoid matching across newlines when a field value is empty.
 - **Mobile keyboard + fixed panels**: `h-dvh`, `interactive-widget`, and `visualViewport` API all failed to fix iOS keyboard pushing slide panels. Left as a known issue.
+- **Next.js Router Cache vs `force-dynamic`**: `force-dynamic` only stops *build-time* static caching. Next.js still caches RSC payloads client-side for ~30s during navigation. If a server file changed while the user was on another date, navigating back shows the *cached* RSC (stale) — `force-dynamic` does not help. Fix per-page: set a "data changed" flag in a tracker, and on mount refetch via a client-side `fetch(/api/...)` which bypasses the Router Cache. This is what `regenerateTracker` + the StoryGrid mount effect does.
 
 ## Two repositories
 
@@ -263,11 +264,11 @@ interface ChatMessage {
 
 | File | Purpose |
 |---|---|
-| `HeaderShell.tsx` | Client component owning all panel state. Optional `date` prop — when absent, hides DateNav and agent buttons (used by teach page). Renders header bar with hamburger, clickable BAINSA logo (links to `/`), DateNav, and agent buttons. Agent buttons show spinner when loading, white dot when unread. Manages `agentLoading` and `agentUnread` state passed to AgentChat. Uses `panelRef` to track current panel in callbacks. |
+| `HeaderShell.tsx` | Client component owning all panel state. Optional `date` prop — when absent, hides DateNav and agent buttons (used by teach page). Renders header bar with hamburger, clickable BAINSA logo (links to `/`), DateNav, and agent buttons. Agent buttons show spinner when loading, white dot when unread — both read from `agentChatTracker` via `useSyncExternalStore`, so state survives date navigation. Uses `panelRef` to track current panel in callbacks. |
 | `SlidePanel.tsx` | Shared slide-out panel: `side` (left/right), `width`, `title` (ReactNode), `onClose`. 220ms translateX animation. |
 | `HamburgerMenu.tsx` | Left slide-out: "Today's Stories" link, search bar (debounced, results as links with `?highlight`), agent output triggers (mobile only, stories page only via `hasDate` prop), "Teach Sofia" link, logout. |
-| `AgentChat.tsx` | Right slide-out chat with Marco/Sofia. Agent tabs for switching. Collapsible+draggable output block, then uses `<ChatMessages>` for the message list + input. Derives `isLoading` from parent's `agentLoading[agent]` (not local state) so thinking indicator persists across drawer open/close. Captures `agent`, `sessionId`, and `date` in `send()` closure so requests complete even if drawer closes mid-flight. Prepends `[Viewing stories for DATE]` to messages so agents know which date is active. |
-| `StoryGrid.tsx` | 4-col grid (responsive). Approve/reject/edit buttons per card — hover overlay on desktop, separate row below card on mobile. Reject flow: clicking REJECT shows inline feedback textarea with SKIP/SUBMIT buttons; feedback stored in approval sidecar. Rejected cards show feedback preview below. Approved cards get green outer glow, rejected get red glow + dark overlay. Compliance badges on failing cards with hover tooltips (card column gets `z-10` on badge hover to prevent clipping). Stale stories banner when Marco ran after Sofia. Export button at bottom (shows approved count if any). Listens for `stories-changed` CustomEvent to refetch. Uses `useSyncExternalStore` with `storyChatTracker` for Sofia loading spinner and "Sofia updated" pill on cards. Updates `editing` state when stories refresh so the open editor receives background changes. Uses `storiesRef` for stable `refreshStories` callback identity. Division filter pills. |
+| `AgentChat.tsx` | Right slide-out chat with Marco/Sofia. Agent tabs for switching. Collapsible+draggable output block, then uses `<ChatMessages>` for the message list + input. Reads loading state directly from `agentChatTracker` keyed by `(date, agent)` so the thinking indicator survives drawer close AND date navigation. Calls `markLoading`/`clearLoading` around `send()`. On completion, if `isActiveView(date, agent)` is false (user left the drawer or switched agent/date), calls `markUnread` so the header button shows a dot. `useEffect` calls `setActiveView({date, agent})` while open. Captures `agent`, `sessionId`, and `date` in `send()` closure so requests complete cleanly even if the component unmounts. Prepends `[Viewing stories for DATE]` to messages. |
+| `StoryGrid.tsx` | 4-col grid (responsive). Approve/reject/edit buttons per card — hover overlay on desktop, separate row below card on mobile. Reject flow: clicking REJECT shows inline feedback textarea with SKIP/SUBMIT buttons; feedback stored in approval sidecar. Rejected cards show feedback preview below. Approved cards get green outer glow, rejected get red glow + dark overlay. Compliance badges on failing cards with hover tooltips (card column gets `z-10` on badge hover to prevent clipping). Stale stories banner when Marco ran after Sofia — Regenerate button sends a reconcile prompt to Sofia (keep unchanged stories as-is, only update/add items that differ in Marco's handoff). Regenerate uses `regenerateTracker`, so the spinner survives date navigation. On completion, the tracker's `changed` flag is set; a mount-time effect in StoryGrid checks the flag and re-fetches via `/api/stories/${date}` (bypassing the Next.js Router Cache) so returning to the date after regen shows fresh stories. Export button at bottom (shows approved count if any). Listens for `stories-changed` CustomEvent to refetch. Uses `useSyncExternalStore` with `storyChatTracker` for Sofia loading spinner and "Sofia updated" pill on cards. Updates `editing` state when stories refresh so the open editor receives background changes. Uses `storiesRef` for stable `refreshStories` callback identity. Division filter pills. |
 | `StoryCard.tsx` | Card shell: fixed scale (editor) or auto-scale via `useLayoutEffect` + `ResizeObserver` (grid). |
 | `StoryContent.tsx` | Inner 9:16 story design: accent border, BAINSA logo, chevron/plus SVG, headline (Alliance No.2), body, source. |
 | `StoryEditor.tsx` | Edit modal. EDITOR/EXPLORE toggle in top bar (resets to EDITOR each open — intentional, not persisted). Desktop: `<PreviewPanel>` + form + chat (3 cols). Mobile: FIELDS/SOFIA tabs. Sofia suggestions auto-save immediately; DISMISS hides the diff banner, REVERT undoes and saves (red hover accent). Detects external story prop changes (background Sofia auto-save) and shows the same diff banner. Variant apply also shows a pending banner with variant-aware label. Inline diff shows strikethrough old + green new. Uses `<HistoryTimeline>` for version history with restore. Fullscreen overlay supports override story (variant cards fullscreen show merged variant, not draft). |
@@ -304,7 +305,11 @@ interface ChatMessage {
 | `time.ts` | `timeAgo(iso)` — "5m ago" / "2h ago" / "3d ago" formatter. Used by `HistoryTimeline`. |
 | `diff.ts` | Simple LCS-based line diff. Returns `{ type: "same" | "added" | "removed", line }[]`. Used by TeachEditor for history diff view. |
 | `storyUtils.ts` | Shared story helpers: `applyUpdates()`, `diffFields()`, `storyEqual()`, `COMPARABLE_KEYS`, `FIELD_LABELS`, `TEXT_FIELDS`, `DESIGN_FIELDS`, `VARIANT_FIELDS` (single source of truth — union of text+design, imported by openclaw.ts + ExploreView.tsx), `variantToPatch(variant, mode)` for apply-all/text-only/design-only. Used by StoryEditor, StoryChat, StoryGrid, ExploreView. |
-| `storyChatTracker.ts` | Module-level (outside React) tracker for in-flight story chat requests. Tracks loading state and "updated but unseen" state (persisted to localStorage). Subscribe mechanism + `getSnapshot()` for `useSyncExternalStore` in React components. |
+| `agentTracker.ts` | **Factory** for module-level (outside React) trackers. `createAgentTracker({ storageKey? })` returns `{ markLoading, clearLoading, isLoading, markChanged, clearChanged, isChanged, subscribe, getSnapshot }`. Loading is in-memory only (never persists). Changed is in-memory + optional localStorage persist (hydrated on boot if `storageKey` given). Subscribe/getSnapshot feed `useSyncExternalStore`. Basis for all four trackers below. |
+| `storyChatTracker.ts` | Per-story Sofia chat tracker (`date:index` key). Thin wrapper over `createAgentTracker({ storageKey: "sofia-updated-stories" })`. Loading = request in flight; changed = "updated but unseen" (persisted). |
+| `agentChatTracker.ts` | Per-drawer agent chat tracker (`date:agent` key). Wraps `createAgentTracker({ storageKey: "agent-chat-unread" })`. Loading = spinner in header button; changed = unread dot. Also exposes `setActiveView({date, agent})` / `isActiveView(date, agent)` so completions know whether to raise the unread flag (not raised if user is currently viewing that agent/date in the drawer). |
+| `variantsTracker.ts` | Per-story variant generation tracker (`date:index` key). Ephemeral (no `storageKey`). Only uses loading side: `markGenerating` / `clearGenerating` / `isGenerating`. StoryEditor subscribes via `useSyncExternalStore`; an effect watches the loading→idle transition and refetches variants so users who closed the editor mid-generation see the new batch on reopen. |
+| `regenerateTracker.ts` | Per-date "regenerate all stories" tracker. Wraps the factory with no storage key. Loading = regenerate button spinner (survives date navigation). Changed = "file on disk newer than Router Cache for this date" flag, set when Sofia's response returns; a mount-time effect in StoryGrid checks the flag and re-fetches via API to bypass the Next.js Router Cache when returning to the regen date. |
 | `chat.ts` | Shared chat helpers: `autoResize()`, `handleChatKeyDown()`, `loadMessages()`, `saveMessages()`, and localStorage key helpers (`storyChatKey`, `storyChatSessionKey`, `agentChatKey`, `agentChatSessionKey`). |
 | `markdown.tsx` | Shared `renderMarkdown()` + `linkSources()` for agent output rendering. Handles headings, bold, links, source+link merging. |
 | `fs.ts` | `fileExists()` utility. |
@@ -380,12 +385,19 @@ All mutation endpoints require `X-Requested-With: fetch` header (CSRF prevention
 
 ## Background agent requests
 
-**AgentChat** (drawer) requests continue even when the drawer is closed:
+**AgentChat** (drawer) requests continue across drawer close AND date navigation:
 - `send()` captures `agent`, `sessionId`, and `date` in local variables at call time
 - `persistMessages()` accepts explicit agent/sessionId/date params instead of reading from state
-- Loading state is owned by HeaderShell (`agentLoading: Record<Agent, boolean>`) and passed down
-- When a request finishes and the drawer isn't showing that agent, `agentUnread` is set
-- Opening the agent drawer clears its unread flag
+- Loading/unread state lives in `agentChatTracker` (module-level, outside React) keyed by `(date, agent)`. HeaderShell and AgentChat both subscribe via `useSyncExternalStore`.
+- `send()` calls `markLoading(date, agent)` / `clearLoading(date, agent)`. On completion, if `isActiveView(date, agent)` is false, calls `markUnread(date, agent)` so the header button shows a dot.
+- AgentChat maintains `setActiveView` while the drawer is open for that agent/date; clears it on close.
+- Opening the agent drawer calls `clearUnread(date, agent)`.
+- Unread flag persists to localStorage (`"agent-chat-unread"` key).
+
+**Regenerate (stale banner)** requests also survive date navigation AND the Next.js Router Cache:
+- `regenerate()` in StoryGrid calls `markRegenerating(date)` before fetching `/api/agent-chat` and `clearRegenerating(date)` in finally.
+- Spinner on the Regenerate button reads `isRegenerating(date)` — unaffected by unmount.
+- On success, `markRegenerated(date)` sets a "file newer than cache" flag. A mount-time `useEffect` in StoryGrid checks `isRegenerated(date)` and, if true, calls `refreshStories()` (which hits the API, bypassing the Router Cache) then `clearRegenerated(date)`. This is how returning to the regen date after navigation shows fresh stories — the RSC cache is stale, but the flag forces a client-side API refetch.
 
 **StoryChat** (editor) requests continue even when the editor modal is closed:
 - `send()` captures all values in closures; `mountedRef` tracks whether the component is still alive
@@ -400,11 +412,10 @@ All mutation endpoints require `X-Requested-With: fetch` header (CSRF prevention
 
 ## Cross-component communication
 
-- **`stories-changed` CustomEvent**: Dispatched by AgentChat and StoryChat (on background auto-save) after any agent reply. StoryGrid listens and refetches stories + stale status.
-- **`storyChatTracker` + `useSyncExternalStore`**: StoryGrid subscribes to loading/updated state changes for showing per-card Sofia indicators. StoryChat subscribes to reload messages when background requests finish.
+- **`stories-changed` CustomEvent**: Dispatched by AgentChat, StoryChat (on background auto-save), and StoryGrid's regenerate after any agent reply. StoryGrid listens and refetches stories + stale status.
+- **Trackers + `useSyncExternalStore`** (`agentTracker.ts` factory): Four trackers live outside React — `storyChatTracker` (per-story Sofia chat), `agentChatTracker` (per-drawer agent chat), `variantsTracker` (per-story variant generation), `regenerateTracker` (per-date stale-banner regen). Components subscribe to get loading/changed state that survives unmount and date navigation.
 - **`editing` state update**: StoryGrid updates `editing` when stories refresh, so StoryEditor receives background changes via prop. StoryEditor detects prop changes and shows the diff banner.
 - **`onSaved` callback**: StoryEditor calls this to update StoryGrid's in-memory stories after a save.
-- **`onLoadingChange` callback**: AgentChat notifies HeaderShell when requests start/end.
 
 ## What's NOT built yet
 

@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/fetch";
 import { checkCompliance } from "@/lib/compliance";
 import { diffFields } from "@/lib/storyUtils";
 import { isStoryChatLoading, isUpdatedUnseen, clearUpdated, subscribe as subscribeChatTracker, getSnapshot as getChatTrackerSnapshot } from "@/lib/storyChatTracker";
+import { markRegenerating, clearRegenerating, isRegenerating, markRegenerated, clearRegenerated, isRegenerated, subscribe as subscribeRegen, getSnapshot as getRegenSnapshot } from "@/lib/regenerateTracker";
 import StoryCard from "./StoryCard";
 import ComplianceBadge from "./ComplianceBadge";
 import StoryEditor from "./StoryEditor";
@@ -61,7 +62,8 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
   const [editing, setEditing] = useState<Story | null>(null);
   const [showExport, setShowExport] = useState(false);
   const [stale, setStale] = useState<string | null>(null); // Marco's lastRun if stale
-  const [regenerating, setRegenerating] = useState(false);
+  useSyncExternalStore(subscribeRegen, getRegenSnapshot);
+  const regenerating = isRegenerating(date);
   const [rejectingIndex, setRejectingIndex] = useState<number | null>(null);
   const feedbackRef = useRef<HTMLTextAreaElement | null>(null);
   const setFeedbackRef = useCallback((el: HTMLTextAreaElement | null) => {
@@ -92,20 +94,20 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
   useEffect(() => { checkStale(); }, [checkStale]);
 
   async function regenerate() {
-    setRegenerating(true);
+    const d = date;
+    markRegenerating(d);
     try {
       const sessionId = `regen-${Date.now()}`;
       await apiFetch("/api/agent-chat", {
         agent: "sofia",
-        message: "/new regenerate all stories from Marco's latest handoff",
+        message: `Marco updated handoffs/${date}.md. Reconcile stories/${date}.md with it: read both files, match each existing story to a Marco item, keep stories whose source is unchanged EXACTLY as-is, add new stories only for Marco items that have no matching story yet, and update only stories whose source material actually changed. Do not rewrite stories that don't need to change. Do not ask for confirmation.`,
         sessionId,
         newSession: true,
       });
-      // Refetch stories and stale status
-      await refreshStories();
-      await checkStale();
+      markRegenerated(d);
+      document.dispatchEvent(new CustomEvent("stories-changed"));
     } catch {} finally {
-      setRegenerating(false);
+      clearRegenerating(d);
     }
   }
 
@@ -151,6 +153,16 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
       if (data.approvals) setApprovals(data.approvals);
     } catch {}
   }, [date]);
+
+  // After regen completes, the file on disk is newer than the cached RSC payload.
+  // If the grid mounts (or is still mounted) while the flag is set, pull fresh from the API.
+  useEffect(() => {
+    if (isRegenerated(date)) {
+      refreshStories();
+      checkStale();
+      clearRegenerated(date);
+    }
+  }, [date, refreshStories, checkStale]);
 
   useEffect(() => {
     const handler = () => { refreshStories(); checkStale(); };

@@ -1,10 +1,20 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useSyncExternalStore } from "react";
 import { ChatMessage } from "@/types";
 import { apiFetch } from "@/lib/fetch";
 import { loadMessages, saveMessages, agentChatKey, agentChatSessionKey } from "@/lib/chat";
 import { renderMarkdown } from "@/lib/markdown";
+import {
+  markLoading,
+  clearLoading,
+  isAgentLoading,
+  markUnread,
+  setActiveView,
+  isActiveView,
+  subscribe as subscribeAgentChat,
+  getSnapshot as getAgentChatSnapshot,
+} from "@/lib/agentChatTracker";
 import SlidePanel from "./SlidePanel";
 import ChatMessages from "./ChatMessages";
 
@@ -29,8 +39,6 @@ interface Props {
   outputExpanded: boolean;
   onClose: () => void;
   onSwitchAgent: (agent: Agent) => void;
-  onLoadingChange: (agent: Agent, loading: boolean) => void;
-  agentLoading: Record<string, boolean>;
 }
 
 function getSessionId(date: string, agent: string): string {
@@ -43,7 +51,8 @@ function getSessionId(date: string, agent: string): string {
   return id;
 }
 
-export default function AgentChat({ date, open, agent, outputExpanded, onClose, onSwitchAgent, onLoadingChange, agentLoading }: Props) {
+export default function AgentChat({ date, open, agent, outputExpanded, onClose, onSwitchAgent }: Props) {
+  useSyncExternalStore(subscribeAgentChat, getAgentChatSnapshot, () => 0);
   const [status, setStatus] = useState<Status | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
   const [expanded, setExpanded] = useState(outputExpanded);
@@ -51,7 +60,7 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const isLoading = agent ? agentLoading[agent] : false;
+  const isLoading = agent && date ? isAgentLoading(date, agent) : false;
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const loaded = useRef(false);
   const dragging = useRef(false);
@@ -96,6 +105,14 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
   const switching = useRef(false);
   useEffect(() => { switching.current = true; }, [agent]);
 
+  // Track active view so completions know whether to raise unread flag
+  useEffect(() => {
+    if (open && agent && date) {
+      setActiveView({ date, agent: agent.toLowerCase() });
+      return () => setActiveView(null);
+    }
+  }, [open, agent, date]);
+
   async function send() {
     const text = input.trim();
     if (!text || isLoading || !agent || !sessionId) return;
@@ -112,7 +129,7 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
     const withUser = [...messages, { role: "user" as const, content: text }];
     setMessages(withUser);
     persistMessages(withUser, currentAgentLower, currentSessionId, currentDate);
-    onLoadingChange(currentAgent, true);
+    markLoading(currentDate, currentAgent);
 
     try {
       // Include date context so the agent knows which date we're viewing
@@ -148,7 +165,10 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
       setMessages(withError);
       persistMessages(withError, currentAgentLower, currentSessionId, currentDate);
     } finally {
-      onLoadingChange(currentAgent, false);
+      clearLoading(currentDate, currentAgent);
+      if (!isActiveView(currentDate, currentAgent)) {
+        markUnread(currentDate, currentAgent);
+      }
       inputRef.current?.focus();
     }
   }
@@ -214,7 +234,7 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
             {a}
             {!statusLoading && st && (
               <div
-                className={`w-[5px] h-[5px] rounded-full shrink-0 ${agentLoading[a] ? "animate-pulse" : ""}`}
+                className={`w-[5px] h-[5px] rounded-full shrink-0 ${date && isAgentLoading(date, a) ? "animate-pulse" : ""}`}
                 style={{ background: st.ranToday ? "#22c55e" : "#555" }}
               />
             )}

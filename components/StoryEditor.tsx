@@ -1,9 +1,16 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from "react";
 import { Story, HistoryEntry, ACCENT_COLORS } from "@/types";
 import { apiFetch } from "@/lib/fetch";
 import { clearUpdated } from "@/lib/storyChatTracker";
+import {
+  markGenerating,
+  clearGenerating,
+  isGenerating,
+  subscribe as subscribeVariants,
+  getSnapshot as getVariantsSnapshot,
+} from "@/lib/variantsTracker";
 import { applyUpdates, diffFields, storyEqual, FIELD_LABELS } from "@/lib/storyUtils";
 import { storyChatSessionKey } from "@/lib/chat";
 import StoryCard from "./StoryCard";
@@ -67,8 +74,9 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
   const [mode, setMode] = useState<"editor" | "explore">("editor");
   const [variants, setVariants] = useState<Variant[]>([]);
   const [variantsLoaded, setVariantsLoaded] = useState(false);
-  const [generating, setGenerating] = useState(false);
   const [variantsError, setVariantsError] = useState("");
+  useSyncExternalStore(subscribeVariants, getVariantsSnapshot, () => 0);
+  const generating = isGenerating(date, story.index);
 
   const saved = useRef<Story>({ ...story });
   const currentBeforeViewing = useRef<Story>({ ...story });
@@ -184,7 +192,7 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
   }, [mode, variantsLoaded, variantsUrl]);
 
   async function handleGenerateVariants() {
-    setGenerating(true);
+    markGenerating(date, story.index);
     setVariantsError("");
     try {
       const res = await apiFetch(variantsUrl, {});
@@ -194,9 +202,23 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
     } catch (err) {
       setVariantsError(err instanceof Error ? err.message : "Generation failed");
     } finally {
-      setGenerating(false);
+      clearGenerating(date, story.index);
     }
   }
+
+  // If generation finished while a previous editor instance was unmounted,
+  // its setVariants no-op'd — refetch on true→false transition to catch up.
+  const prevGeneratingRef = useRef(generating);
+  useEffect(() => {
+    const wasGenerating = prevGeneratingRef.current;
+    prevGeneratingRef.current = generating;
+    if (wasGenerating && !generating) {
+      fetch(variantsUrl)
+        .then((r) => r.json())
+        .then((data: { variants: Variant[] }) => setVariants(data.variants ?? []))
+        .catch(() => {});
+    }
+  }, [generating, variantsUrl]);
 
   async function handleApplyVariant(variant: Variant, applyMode: ApplyMode) {
     const patch = variantToPatch(variant, applyMode);
