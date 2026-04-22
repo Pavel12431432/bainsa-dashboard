@@ -7,6 +7,7 @@ import type { StoredProposal } from "@/lib/proposals";
 import HistoryTimeline from "./HistoryTimeline";
 import FeedbackInspector from "./FeedbackInspector";
 import ProposalView from "./ProposalView";
+import DiffBlock from "./DiffBlock";
 
 interface HistoryEntry {
   content: string;
@@ -40,6 +41,7 @@ export default function TeachEditor({ fixed, adaptive, initialHistory, initialPr
   const [inspectorReviewOnly, setInspectorReviewOnly] = useState(false);
   const [inspectorHighlight, setInspectorHighlight] = useState<string[]>([]);
   const [proposalBusy, setProposalBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const isDirty = content !== savedContent;
 
@@ -91,13 +93,14 @@ export default function TeachEditor({ fixed, adaptive, initialHistory, initialPr
   }
 
   async function generateProposal(days: number) {
+    setError(null);
     setMode("generating");
     setInspectorOpen(false);
     try {
       const res = await apiFetch("/api/teach/propose", { days });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Unknown error" }));
-        alert(`Proposal failed: ${err.error || res.statusText}`);
+        setError(`Proposal failed: ${err.error || res.statusText}`);
         setMode("normal");
         return;
       }
@@ -105,19 +108,20 @@ export default function TeachEditor({ fixed, adaptive, initialHistory, initialPr
       setProposal(data.proposal);
       setMode("proposal");
     } catch (err) {
-      alert(`Proposal failed: ${err instanceof Error ? err.message : String(err)}`);
+      setError(`Proposal failed: ${err instanceof Error ? err.message : String(err)}`);
       setMode("normal");
     }
   }
 
   async function acceptProposal() {
     if (!proposal) return;
+    setError(null);
     setProposalBusy(true);
     try {
       const res = await apiFetch("/api/teach/propose/accept", {});
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Unknown error" }));
-        alert(`Accept failed: ${err.error || res.statusText}`);
+        setError(`Accept failed: ${err.error || res.statusText}`);
         return;
       }
       // Update local state to reflect the accepted content
@@ -181,6 +185,21 @@ export default function TeachEditor({ fixed, adaptive, initialHistory, initialPr
           Edit Sofia&apos;s adaptive instructions — style, tone, and copy guidelines
         </p>
       </div>
+
+      {/* Error banner */}
+      {error && (
+        <div className="shrink-0 flex items-start gap-3 rounded-md border border-danger/40 bg-danger/10 px-3 py-2.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-danger mt-1.5 shrink-0" />
+          <p className="flex-1 m-0 text-[0.75rem] text-danger/90 leading-relaxed">{error}</p>
+          <button
+            onClick={() => setError(null)}
+            className="text-[0.7rem] text-danger/70 hover:text-danger bg-transparent border-none cursor-pointer leading-none"
+            aria-label="Dismiss error"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       <div className="flex gap-0 flex-1 min-h-0 max-lg:flex-col max-lg:gap-6">
         {/* Left column — FIXED.md (read-only) */}
@@ -297,29 +316,11 @@ export default function TeachEditor({ fixed, adaptive, initialHistory, initialPr
               busy={proposalBusy}
             />
           ) : viewingIdx !== null && diff ? (
-            <div className="w-full flex-1 min-h-0 rounded-lg border border-border-mid bg-surface text-[0.7rem] leading-relaxed font-mono p-4 overflow-y-auto">
-              {diff.map((d, i) => {
-                if (d.type === "same") {
-                  return (
-                    <div key={i} className="text-brand-white/40 whitespace-pre-wrap min-h-[1.4em]">
-                      {d.line || " "}
-                    </div>
-                  );
-                }
-                if (d.type === "removed") {
-                  return (
-                    <div key={i} className="text-danger/70 line-through whitespace-pre-wrap bg-danger/5 -mx-4 px-4 min-h-[1.4em]">
-                      {d.line || " "}
-                    </div>
-                  );
-                }
-                return (
-                  <div key={i} className="text-success/90 whitespace-pre-wrap bg-success/5 -mx-4 px-4 min-h-[1.4em]">
-                    {d.line || " "}
-                  </div>
-                );
-              })}
-            </div>
+            <DiffBlock
+              lines={diff}
+              inset="x-4"
+              className="w-full flex-1 min-h-0 rounded-lg border border-border-mid bg-surface p-4 overflow-y-auto"
+            />
           ) : (
             <textarea
               ref={textareaRef}

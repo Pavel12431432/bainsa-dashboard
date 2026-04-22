@@ -29,6 +29,13 @@ export async function POST(req: NextRequest) {
     await addInstructionHistory(prev, "Lorenzo proposal accepted", "editor-agent");
   }
 
-  await deleteProposal();
+  // Best-effort cleanup — ADAPTIVE.md is the source of truth. If deletion
+  // fails (disk full, permissions), a follow-up read will see the sidecar
+  // content matches the live file and auto-clean it (see readProposal).
+  try {
+    await deleteProposal();
+  } catch {
+    /* ignored — see comment above */
+  }
   return NextResponse.json({ ok: true });
 }

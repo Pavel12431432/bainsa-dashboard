@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { diffLines } from "@/lib/diff";
 import { timeAgo } from "@/lib/time";
 import type { StoredProposal } from "@/lib/proposals";
+import DiffBlock from "./DiffBlock";
 
 interface Props {
   proposal: StoredProposal;
@@ -140,35 +141,11 @@ export default function ProposalView({
           <div className="text-[0.6rem] uppercase tracking-[0.08em] text-muted font-semibold mb-2">
             Proposed changes
           </div>
-          <div className="rounded border border-border-mid bg-surface-2 p-3 text-[0.7rem] leading-relaxed font-mono">
-            {diff.map((d, i) => {
-              if (d.type === "same") {
-                return (
-                  <div key={i} className="text-brand-white/40 whitespace-pre-wrap min-h-[1.4em]">
-                    {d.line || " "}
-                  </div>
-                );
-              }
-              if (d.type === "removed") {
-                return (
-                  <div
-                    key={i}
-                    className="text-danger/70 line-through whitespace-pre-wrap bg-danger/5 -mx-3 px-3 min-h-[1.4em]"
-                  >
-                    {d.line || " "}
-                  </div>
-                );
-              }
-              return (
-                <div
-                  key={i}
-                  className="text-success/90 whitespace-pre-wrap bg-success/5 -mx-3 px-3 min-h-[1.4em]"
-                >
-                  {d.line || " "}
-                </div>
-              );
-            })}
-          </div>
+          <DiffBlock
+            lines={diff}
+            inset="x-3"
+            className="rounded border border-border-mid bg-surface-2 p-3"
+          />
         </div>
       )}
 

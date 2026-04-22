@@ -4,6 +4,10 @@ import { fileExists } from "@/lib/fs";
 import type { EditorProposal } from "@/lib/editorAgent";
 import type { FeedbackSummary } from "@/lib/editorFeedback";
 
+function adaptivePath(): string {
+  return `${requireEnv("SOFIA_INSTRUCTIONS_PATH")}/ADAPTIVE.md`;
+}
+
 export interface StoredProposal extends EditorProposal {
   generatedAt: string;
   /** Hash-like marker of the ADAPTIVE.md this proposal was built against,
@@ -23,11 +27,25 @@ function proposalPath(): string {
 export async function readProposal(): Promise<StoredProposal | null> {
   const path = proposalPath();
   if (!(await fileExists(path))) return null;
+  let stored: StoredProposal;
   try {
-    return JSON.parse(await readFile(path, "utf-8")) as StoredProposal;
+    stored = JSON.parse(await readFile(path, "utf-8")) as StoredProposal;
   } catch {
     return null;
   }
+
+  // Self-heal: if the proposal's content already matches live ADAPTIVE.md,
+  // it was accepted but the sidecar survived (e.g. delete failed mid-accept).
+  // Clean it up silently and report no pending proposal.
+  if (stored.status === "proposal" && stored.proposedContent) {
+    const current = await readFile(adaptivePath(), "utf-8").catch(() => null);
+    if (current !== null && current === stored.proposedContent) {
+      await unlink(path).catch(() => {});
+      return null;
+    }
+  }
+
+  return stored;
 }
 
 export async function writeProposal(p: StoredProposal): Promise<void> {
