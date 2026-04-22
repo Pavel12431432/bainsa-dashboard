@@ -3,21 +3,28 @@
 import { useState, useRef, useMemo } from "react";
 import { apiFetch } from "@/lib/fetch";
 import { diffLines } from "@/lib/diff";
+import type { StoredProposal } from "@/lib/proposals";
 import HistoryTimeline from "./HistoryTimeline";
+import FeedbackInspector from "./FeedbackInspector";
+import ProposalView from "./ProposalView";
 
 interface HistoryEntry {
   content: string;
   label: string;
   timestamp: string;
+  source?: "human" | "editor-agent";
 }
 
 interface Props {
   fixed: string;
   adaptive: string;
   initialHistory: HistoryEntry[];
+  initialProposal: StoredProposal | null;
 }
 
-export default function TeachEditor({ fixed, adaptive, initialHistory }: Props) {
+type Mode = "normal" | "generating" | "proposal";
+
+export default function TeachEditor({ fixed, adaptive, initialHistory, initialProposal }: Props) {
   const [content, setContent] = useState(adaptive);
   const [savedContent, setSavedContent] = useState(adaptive);
   const [saving, setSaving] = useState(false);
@@ -26,7 +33,20 @@ export default function TeachEditor({ fixed, adaptive, initialHistory }: Props) 
   const [viewingIdx, setViewingIdx] = useState<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Proposal state
+  const [mode, setMode] = useState<Mode>(initialProposal ? "proposal" : "normal");
+  const [proposal, setProposal] = useState<StoredProposal | null>(initialProposal);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [inspectorReviewOnly, setInspectorReviewOnly] = useState(false);
+  const [inspectorHighlight, setInspectorHighlight] = useState<string[]>([]);
+  const [proposalBusy, setProposalBusy] = useState(false);
+
   const isDirty = content !== savedContent;
+
+  async function refreshHistory() {
+    const res = await fetch("/api/teach/history");
+    if (res.ok) setHistory(await res.json());
+  }
 
   async function save(text?: string) {
     const toSave = text ?? content;
@@ -35,16 +55,13 @@ export default function TeachEditor({ fixed, adaptive, initialHistory }: Props) 
       const res = await apiFetch("/api/teach/save", { content: toSave });
       if (res.ok) {
         setSavedContent(toSave);
-        // Refresh history
-        const histRes = await fetch("/api/teach/history");
-        if (histRes.ok) setHistory(await histRes.json());
+        await refreshHistory();
       }
     } finally {
       setSaving(false);
     }
   }
 
-  // Diff between history entry (old) and current saved content (new)
   const diff = useMemo(() => {
     if (viewingIdx === null) return null;
     return diffLines(history[viewingIdx].content, savedContent);
@@ -66,6 +83,95 @@ export default function TeachEditor({ fixed, adaptive, initialHistory }: Props) 
     await save(restored);
   }
 
+  // Proposal actions
+  function openInspector() {
+    setInspectorReviewOnly(false);
+    setInspectorHighlight([]);
+    setInspectorOpen(true);
+  }
+
+  async function generateProposal(days: number) {
+    setMode("generating");
+    setInspectorOpen(false);
+    try {
+      const res = await apiFetch("/api/teach/propose", { days });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Unknown error" }));
+        alert(`Proposal failed: ${err.error || res.statusText}`);
+        setMode("normal");
+        return;
+      }
+      const data = (await res.json()) as { proposal: StoredProposal };
+      setProposal(data.proposal);
+      setMode("proposal");
+    } catch (err) {
+      alert(`Proposal failed: ${err instanceof Error ? err.message : String(err)}`);
+      setMode("normal");
+    }
+  }
+
+  async function acceptProposal() {
+    if (!proposal) return;
+    setProposalBusy(true);
+    try {
+      const res = await apiFetch("/api/teach/propose/accept", {});
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Unknown error" }));
+        alert(`Accept failed: ${err.error || res.statusText}`);
+        return;
+      }
+      // Update local state to reflect the accepted content
+      if (proposal.proposedContent) {
+        setContent(proposal.proposedContent);
+        setSavedContent(proposal.proposedContent);
+      }
+      setProposal(null);
+      setMode("normal");
+      await refreshHistory();
+    } finally {
+      setProposalBusy(false);
+    }
+  }
+
+  async function rejectProposal() {
+    setProposalBusy(true);
+    try {
+      await fetch("/api/teach/propose", {
+        method: "DELETE",
+        headers: { "X-Requested-With": "fetch" },
+      });
+      setProposal(null);
+      setMode("normal");
+    } finally {
+      setProposalBusy(false);
+    }
+  }
+
+  async function editProposal() {
+    if (!proposal?.proposedContent) return;
+    // Drop into normal edit mode, pre-filled with the proposed content.
+    // Also discard the sidecar — once the user edits, the proposal is consumed.
+    setProposalBusy(true);
+    try {
+      await fetch("/api/teach/propose", {
+        method: "DELETE",
+        headers: { "X-Requested-With": "fetch" },
+      });
+      setContent(proposal.proposedContent);
+      setProposal(null);
+      setMode("normal");
+      // Do NOT save yet — let the user tweak and hit SAVE themselves.
+    } finally {
+      setProposalBusy(false);
+    }
+  }
+
+  function openInspectorForRefs(refs: string[]) {
+    setInspectorReviewOnly(true);
+    setInspectorHighlight(refs);
+    setInspectorOpen(true);
+  }
+
   return (
     <div className="flex flex-col gap-6 h-[calc(100vh-100px)]">
       {/* Page title */}
@@ -79,7 +185,6 @@ export default function TeachEditor({ fixed, adaptive, initialHistory }: Props) 
       <div className="flex gap-0 flex-1 min-h-0 max-lg:flex-col max-lg:gap-6">
         {/* Left column — FIXED.md (read-only) */}
         <div className={`shrink-0 flex flex-col transition-all duration-200 max-lg:w-full ${fixedCollapsed ? "w-10" : "w-[420px]"}`}>
-          {/* Header row */}
           <div className={`flex items-center h-[34px] mb-3 shrink-0 ${fixedCollapsed ? "justify-center" : "gap-2"}`}>
             <button
               onClick={() => setFixedCollapsed(!fixedCollapsed)}
@@ -123,11 +228,11 @@ export default function TeachEditor({ fixed, adaptive, initialHistory }: Props) 
           )}
         </div>
 
-        {/* Right column — ADAPTIVE.md (editable) */}
+        {/* Right column — ADAPTIVE.md */}
         <div className="flex-1 min-w-0 flex flex-col min-h-0">
           {/* Header row */}
-          <div className="flex items-center justify-between h-[34px] mb-3 shrink-0">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between h-[34px] mb-3 shrink-0 gap-3">
+            <div className="flex items-center gap-2 min-w-0">
               <span className="text-[0.65rem] font-semibold text-brand-white opacity-25 tracking-[0.08em] uppercase">
                 Adaptive Instructions
               </span>
@@ -136,46 +241,81 @@ export default function TeachEditor({ fixed, adaptive, initialHistory }: Props) 
                   viewing history
                 </span>
               )}
-              {viewingIdx === null && isDirty && (
+              {viewingIdx === null && mode === "normal" && isDirty && (
                 <span className="text-[0.55rem] font-semibold text-amber-400/70 tracking-[0.04em]">
                   unsaved changes
                 </span>
               )}
+              {mode === "generating" && (
+                <span className="text-[0.55rem] font-semibold text-accent-culture/70 tracking-[0.04em]">
+                  lorenzo is reviewing...
+                </span>
+              )}
+              {mode === "proposal" && (
+                <span className="text-[0.55rem] font-semibold text-accent-culture/70 tracking-[0.04em]">
+                  proposal pending
+                </span>
+              )}
             </div>
-            <button
-              onClick={() => save()}
-              disabled={!isDirty || saving || viewingIdx !== null}
-              className={`px-4 py-1.5 rounded-[5px] text-[0.65rem] font-semibold tracking-[0.04em] border-none transition-all duration-150 ${
-                !isDirty || saving || viewingIdx !== null
-                  ? "bg-border-mid text-muted cursor-not-allowed"
-                  : "bg-brand-white text-brand-black cursor-pointer"
-              }`}
-            >
-              {saving ? "SAVING..." : "SAVE"}
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              {mode === "normal" && viewingIdx === null && (
+                <button
+                  onClick={openInspector}
+                  className="px-3 py-1.5 rounded-[5px] text-[0.65rem] font-semibold tracking-[0.04em] border border-border-mid text-brand-white/80 bg-transparent cursor-pointer hover:text-brand-white hover:border-brand-white/40 transition-colors"
+                  title="Review recent feedback and generate a proposal"
+                >
+                  PROPOSE UPDATES
+                </button>
+              )}
+              {mode === "normal" && (
+                <button
+                  onClick={() => save()}
+                  disabled={!isDirty || saving || viewingIdx !== null}
+                  className={`px-4 py-1.5 rounded-[5px] text-[0.65rem] font-semibold tracking-[0.04em] border-none transition-all duration-150 ${
+                    !isDirty || saving || viewingIdx !== null
+                      ? "bg-border-mid text-muted cursor-not-allowed"
+                      : "bg-brand-white text-brand-black cursor-pointer"
+                  }`}
+                >
+                  {saving ? "SAVING..." : "SAVE"}
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* Editor or diff view */}
-          {viewingIdx !== null && diff ? (
+          {/* Main panel — switches by mode */}
+          {mode === "generating" ? (
+            <GeneratingPanel />
+          ) : mode === "proposal" && proposal ? (
+            <ProposalView
+              proposal={proposal}
+              currentAdaptive={savedContent}
+              onAccept={acceptProposal}
+              onReject={rejectProposal}
+              onEdit={editProposal}
+              onInspect={openInspectorForRefs}
+              busy={proposalBusy}
+            />
+          ) : viewingIdx !== null && diff ? (
             <div className="w-full flex-1 min-h-0 rounded-lg border border-border-mid bg-surface text-[0.7rem] leading-relaxed font-mono p-4 overflow-y-auto">
               {diff.map((d, i) => {
                 if (d.type === "same") {
                   return (
                     <div key={i} className="text-brand-white/40 whitespace-pre-wrap min-h-[1.4em]">
-                      {d.line || "\u00A0"}
+                      {d.line || " "}
                     </div>
                   );
                 }
                 if (d.type === "removed") {
                   return (
                     <div key={i} className="text-danger/70 line-through whitespace-pre-wrap bg-danger/5 -mx-4 px-4 min-h-[1.4em]">
-                      {d.line || "\u00A0"}
+                      {d.line || " "}
                     </div>
                   );
                 }
                 return (
                   <div key={i} className="text-success/90 whitespace-pre-wrap bg-success/5 -mx-4 px-4 min-h-[1.4em]">
-                    {d.line || "\u00A0"}
+                    {d.line || " "}
                   </div>
                 );
               })}
@@ -208,6 +348,32 @@ export default function TeachEditor({ fixed, adaptive, initialHistory }: Props) 
           </div>
         </div>
       </div>
+
+      <FeedbackInspector
+        open={inspectorOpen}
+        onClose={() => setInspectorOpen(false)}
+        onGenerate={generateProposal}
+        generating={mode === "generating"}
+        highlightRefs={inspectorHighlight}
+        reviewOnly={inspectorReviewOnly}
+      />
+    </div>
+  );
+}
+
+function GeneratingPanel() {
+  return (
+    <div className="w-full flex-1 min-h-0 rounded-lg border border-border-mid bg-surface flex flex-col items-center justify-center gap-4 p-8">
+      <div className="flex items-center gap-3">
+        <span className="w-2 h-2 rounded-full bg-accent-culture animate-pulse" />
+        <span className="text-[0.85rem] text-brand-white/80 font-semibold">
+          Lorenzo is reviewing recent feedback...
+        </span>
+      </div>
+      <p className="text-[0.7rem] text-muted max-w-md text-center leading-relaxed m-0">
+        This usually takes 30–60 seconds. He&apos;s clustering the feedback into themes, checking
+        for conflicts, and drafting a proposal.
+      </p>
     </div>
   );
 }

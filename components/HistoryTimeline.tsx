@@ -3,7 +3,7 @@
 import { timeAgo } from "@/lib/time";
 
 interface Props {
-  entries: Array<{ label: string; timestamp: string }>;
+  entries: Array<{ label: string; timestamp: string; source?: "human" | "editor-agent" }>;
   viewingIdx: number | null;
   onSelect: (idx: number) => void;
   onRestore: () => void;
@@ -60,8 +60,16 @@ export default function HistoryTimeline({ entries, viewingIdx, onSelect, onResto
                   isActive ? "bg-brand-white" : isCurrent ? "bg-success" : "bg-border-mid"
                 }`}
               />
-              <span className="text-[0.7rem] text-brand-white opacity-80 truncate flex-1">
-                {entry.label}
+              <span className="text-[0.7rem] text-brand-white opacity-80 truncate flex-1 flex items-center gap-2">
+                <span className="truncate">{entry.label}</span>
+                {entry.source === "editor-agent" && (
+                  <span
+                    className="text-[0.5rem] font-semibold uppercase tracking-[0.08em] text-accent-culture/80 shrink-0"
+                    title="Written by Lorenzo (editor agent)"
+                  >
+                    lorenzo
+                  </span>
+                )}
               </span>
               <span className="text-[0.6rem] text-muted shrink-0">
                 {timeAgo(entry.timestamp)}
