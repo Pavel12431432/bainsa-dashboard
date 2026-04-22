@@ -5,7 +5,11 @@ import { Story } from "@/types";
 import { VARIANT_FIELDS } from "@/lib/storyUtils";
 import type { NewVariant } from "@/lib/variants";
 
-const AGENT_CLI_NAMES = { marco: "news-researcher", sofia: "story-generator" } as const;
+const AGENT_CLI_NAMES = {
+  marco: "news-researcher",
+  sofia: "story-generator",
+  lorenzo: "story-editor",
+} as const;
 export type AgentId = keyof typeof AGENT_CLI_NAMES;
 
 export function buildUserMessage(story: Story, instruction: string): string {
@@ -69,8 +73,19 @@ function demoResponse(agent: AgentId, message: string): string {
     utimes(storyFile, now, now).catch(() => {});
     return `Demo mode: reviewed Marco's handoff for ${reconcileMatch[1]}. No new items to reconcile — existing stories are up to date.`;
   }
+  // Lorenzo — editor agent receives a FeedbackBundle
+  if (agent === "lorenzo" && message.includes("<FeedbackBundle>")) {
+    const demoProposal = {
+      status: "no-changes",
+      summary: "Demo mode: Lorenzo isn't actually running. In production I'd review the feedback bundle and propose targeted edits to ADAPTIVE.md.",
+      rationale: [],
+      conflicts: [],
+      proposedContent: null,
+    };
+    return JSON.stringify(demoProposal, null, 2);
+  }
   // Free-form agent drawer chat
-  const who = agent === "marco" ? "Marco" : "Sofia";
+  const who = agent === "marco" ? "Marco" : agent === "sofia" ? "Sofia" : "Lorenzo";
   return `**Demo mode** — ${who} isn't actually running. In production I'd respond to:\n\n> ${message.slice(0, 200)}${message.length > 200 ? "…" : ""}\n\nSet \`DEMO_MODE=false\` and configure OpenClaw to get real agent responses.`;
 }
 

@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start --port 3000",
     "deploy": "next build && sudo systemctl restart bainsa-dashboard",
-    "lint": "eslint"
+    "lint": "eslint",
+    "editor-agent:test": "tsx scripts/testEditorAgent.ts"
   },
   "dependencies": {
     "html2canvas-pro": "^2.0.2",
@@ -24,6 +25,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }
