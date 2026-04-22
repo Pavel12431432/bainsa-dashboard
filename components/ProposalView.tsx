@@ -48,16 +48,33 @@ export default function ProposalView({
         )}
       </div>
 
-      {/* Stale banner */}
-      {isStale && (
+      {/* Stale banner (only meaningful when there's a diff to look at) */}
+      {isStale && canApply && (
         <div className="px-4 py-2 bg-amber-500/10 border-b border-amber-500/30 text-[0.65rem] text-amber-300">
           ADAPTIVE.md has changed since this proposal was generated. The diff below compares the
           proposal to the current file — review carefully or discard and regenerate.
         </div>
       )}
 
-      {/* Summary */}
-      {proposal.summary && (
+      {/* No-changes centered message */}
+      {proposal.status === "no-changes" && (
+        <div className="flex flex-col items-center justify-center text-center gap-3 px-6 py-10">
+          <div className="text-[0.75rem] font-semibold text-brand-white/80">
+            Lorenzo is leaving things alone
+          </div>
+          {proposal.summary && (
+            <p className="text-[0.7rem] text-brand-white/60 leading-relaxed max-w-md m-0">
+              {proposal.summary}
+            </p>
+          )}
+          <p className="text-[0.65rem] text-muted m-0">
+            Come back after more feedback accumulates, or dismiss to remove this notice.
+          </p>
+        </div>
+      )}
+
+      {/* Summary (only when there's a proposal to explain) */}
+      {proposal.status === "proposal" && proposal.summary && (
         <div className="px-4 py-3 border-b border-border-mid">
           <p className="text-[0.75rem] text-brand-white/80 leading-relaxed m-0">{proposal.summary}</p>
         </div>
@@ -65,13 +82,16 @@ export default function ProposalView({
 
       {/* Conflicts */}
       {proposal.conflicts.length > 0 && (
-        <div className="px-4 py-3 border-b border-border-mid">
-          <div className="text-[0.6rem] uppercase tracking-[0.08em] text-amber-400 font-semibold mb-2">
-            Conflicts flagged
+        <div className="mx-4 my-3 rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2.5">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+            <span className="text-[0.6rem] uppercase tracking-[0.08em] text-amber-300 font-semibold">
+              Conflicting signals — review before accepting
+            </span>
           </div>
           <ul className="list-none p-0 m-0 flex flex-col gap-1.5">
             {proposal.conflicts.map((c, i) => (
-              <li key={i} className="text-[0.7rem] text-brand-white/80 leading-relaxed">
+              <li key={i} className="text-[0.7rem] text-brand-white/85 leading-relaxed">
                 <span>{c.description} </span>
                 {c.signalRefs.length > 0 && (
                   <button
@@ -159,7 +179,7 @@ export default function ProposalView({
           disabled={busy}
           className="text-[0.65rem] font-semibold text-muted bg-transparent border border-border-mid rounded px-3 py-1.5 cursor-pointer hover:text-danger hover:border-danger/40 disabled:opacity-50"
         >
-          REJECT
+          {canApply ? "REJECT" : "DISMISS"}
         </button>
         {canApply && (
           <>
