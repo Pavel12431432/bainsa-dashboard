@@ -5,6 +5,8 @@ export interface InstructionHistoryEntry {
   content: string;
   label: string;
   timestamp: string;
+  /** Who produced this version. Absent on older entries (treat as "human"). */
+  source?: "human" | "editor-agent";
 }
 
 function historyPath(): string {
@@ -18,9 +20,10 @@ export async function readInstructionHistory(): Promise<InstructionHistoryEntry[
 export async function addInstructionHistory(
   content: string,
   label: string,
+  source: "human" | "editor-agent" = "human",
 ): Promise<InstructionHistoryEntry[]> {
   return addEntry<InstructionHistoryEntry>(
     historyPath(),
-    { content, label, timestamp: new Date().toISOString() },
+    { content, label, timestamp: new Date().toISOString(), source },
   );
 }
