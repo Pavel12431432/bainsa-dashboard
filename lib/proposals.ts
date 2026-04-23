@@ -8,6 +8,15 @@ function adaptivePath(): string {
   return `${requireEnv("SOFIA_INSTRUCTIONS_PATH")}/ADAPTIVE.md`;
 }
 
+export type ProposalWarning =
+  | "significant-shrinkage"
+  | "unchanged-from-previous";
+
+export interface RefineTurn {
+  nudge: string;
+  refinedAt: string;
+}
+
 export interface StoredProposal extends EditorProposal {
   generatedAt: string;
   /** Hash-like marker of the ADAPTIVE.md this proposal was built against,
@@ -18,6 +27,16 @@ export interface StoredProposal extends EditorProposal {
    *  Lets us compute "significant new feedback since generatedAt" later. */
   basedOnSummary: FeedbackSummary;
   windowDays: number;
+  /** Server-detected notices the UI surfaces (e.g. "Lorenzo shrank the file
+   *  by 60% — review carefully"). Undefined = no warnings. */
+  warnings?: ProposalWarning[];
+  /** One entry per nudge the operator has asked Lorenzo to apply, in order.
+   *  Used for the breadcrumb under the proposal header. */
+  refineHistory?: RefineTurn[];
+  /** The single prior proposal (pre-refine). Present only when the current
+   *  proposal is the result of a refine. Enables one-shot UNDO REFINE — we
+   *  deliberately only keep one level to avoid unbounded recursion. */
+  previousProposal?: Omit<StoredProposal, "previousProposal">;
 }
 
 function proposalPath(): string {

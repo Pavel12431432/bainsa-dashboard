@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { diffLines } from "@/lib/diff";
 import { timeAgo } from "@/lib/time";
 import type { StoredProposal } from "@/lib/proposals";
@@ -13,9 +13,18 @@ interface Props {
   onAccept: () => void;
   onReject: () => void;
   onEdit: () => void;
+  onRefine: (nudge: string) => void;
+  onUndoRefine: () => void;
   onInspect: (refs: string[]) => void;
   busy?: boolean;
 }
+
+const WARNING_COPY: Record<NonNullable<StoredProposal["warnings"]>[number], string> = {
+  "significant-shrinkage":
+    "Lorenzo shrank ADAPTIVE.md significantly — review carefully before accepting, this often means content was dropped.",
+  "unchanged-from-previous":
+    "Lorenzo left the proposed content unchanged from before. Check the summary — he likely decided your nudge was already captured.",
+};
 
 export default function ProposalView({
   proposal,
@@ -23,11 +32,42 @@ export default function ProposalView({
   onAccept,
   onReject,
   onEdit,
+  onRefine,
+  onUndoRefine,
   onInspect,
   busy,
 }: Props) {
   const isStale = proposal.basedOnAdaptive !== currentAdaptive;
   const canApply = proposal.status === "proposal" && !!proposal.proposedContent;
+  const [refineOpen, setRefineOpen] = useState(false);
+  const [nudge, setNudge] = useState("");
+  const refineRef = useRef<HTMLDivElement>(null);
+  const nudgeInputRef = useRef<HTMLTextAreaElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // When refine opens, scroll the form into view (it lives below the diff,
+  // which can be long) and focus the textarea so the user can type immediately.
+  useEffect(() => {
+    if (!refineOpen) return;
+    refineRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    nudgeInputRef.current?.focus();
+  }, [refineOpen]);
+
+  // When the proposal changes (fresh generate OR refine response), scroll
+  // the panel back to the top so the user sees the summary first. Especially
+  // important on refine when the diff can be nearly identical — the summary
+  // is where Lorenzo explains what he did or didn't change.
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  }, [proposal.generatedAt]);
+
+  function submitNudge() {
+    const trimmed = nudge.trim();
+    if (!trimmed) return;
+    onRefine(trimmed);
+    setNudge("");
+    setRefineOpen(false);
+  }
 
   const diff = useMemo(() => {
     if (!canApply || !proposal.proposedContent) return null;
@@ -35,7 +75,10 @@ export default function ProposalView({
   }, [canApply, proposal.proposedContent, currentAdaptive]);
 
   return (
-    <div className="w-full flex-1 min-h-0 overflow-y-auto rounded-lg border border-border-mid bg-surface">
+    <div
+      ref={scrollRef}
+      className="w-full flex-1 min-h-0 overflow-y-auto rounded-lg border border-border-mid bg-surface"
+    >
       {/* Header */}
       <div className="px-4 py-3 border-b border-border-mid flex items-center gap-3 flex-wrap">
         <span className="text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-accent-culture">
@@ -48,6 +91,42 @@ export default function ProposalView({
           <span className="text-[0.6rem] font-semibold text-muted ml-auto">NO CHANGES PROPOSED</span>
         )}
       </div>
+
+      {/* Refine breadcrumb */}
+      {proposal.refineHistory && proposal.refineHistory.length > 0 && (
+        <div className="px-4 py-2 border-b border-border-mid bg-surface-2/40 flex items-start gap-2">
+          <span className="text-[0.55rem] uppercase tracking-[0.08em] text-muted font-semibold shrink-0 mt-[2px]">
+            Refined {proposal.refineHistory.length}×
+          </span>
+          <span className="text-[0.65rem] text-brand-white/60 flex-1 leading-relaxed">
+            {proposal.refineHistory
+              .map((t) => `"${t.nudge}"`)
+              .join(" → ")}
+          </span>
+          {proposal.previousProposal && (
+            <button
+              onClick={onUndoRefine}
+              disabled={busy}
+              className="text-[0.6rem] font-semibold text-muted hover:text-brand-white bg-transparent border border-border-mid rounded px-2 py-0.5 cursor-pointer shrink-0 disabled:opacity-50"
+              title="Revert to the proposal before the last refine"
+            >
+              UNDO
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Warnings */}
+      {proposal.warnings && proposal.warnings.length > 0 && (
+        <div className="mx-4 my-3 rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2.5 flex flex-col gap-1.5">
+          {proposal.warnings.map((w) => (
+            <div key={w} className="flex items-start gap-2 text-[0.7rem] text-amber-200/90 leading-relaxed">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 shrink-0" />
+              <span className="flex-1">{WARNING_COPY[w]}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Stale banner (only meaningful when there's a diff to look at) */}
       {isStale && canApply && (
@@ -149,6 +228,53 @@ export default function ProposalView({
         </div>
       )}
 
+      {/* Refine form */}
+      {canApply && refineOpen && (
+        <div ref={refineRef} className="px-4 py-3 border-t border-border-mid bg-surface-2/50">
+          <div className="text-[0.6rem] uppercase tracking-[0.08em] text-muted font-semibold mb-2">
+            Ask Lorenzo to refine
+          </div>
+          <textarea
+            ref={nudgeInputRef}
+            value={nudge}
+            onChange={(e) => setNudge(e.target.value)}
+            placeholder="e.g. &quot;don't remove the statistic rule — soften it instead&quot;"
+            spellCheck={false}
+            rows={2}
+            className="w-full rounded-md border border-border-mid bg-surface text-[0.75rem] text-brand-white/85 p-2.5 resize-none focus:outline-none focus:border-brand-white/40 placeholder:text-muted"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                submitNudge();
+              }
+            }}
+          />
+          <div className="flex items-center justify-end gap-2 mt-2">
+            <button
+              onClick={() => {
+                setRefineOpen(false);
+                setNudge("");
+              }}
+              disabled={busy}
+              className="text-[0.65rem] font-semibold text-muted bg-transparent border border-border-mid rounded px-3 py-1.5 cursor-pointer hover:text-brand-white disabled:opacity-50"
+            >
+              CANCEL
+            </button>
+            <button
+              onClick={submitNudge}
+              disabled={busy || !nudge.trim()}
+              className={`text-[0.65rem] font-semibold tracking-[0.04em] rounded px-4 py-1.5 transition-all ${
+                busy || !nudge.trim()
+                  ? "bg-border-mid text-muted cursor-not-allowed"
+                  : "bg-brand-white text-brand-black cursor-pointer"
+              }`}
+            >
+              REFINE
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Actions */}
       <div className="px-4 py-3 border-t border-border-mid flex items-center justify-end gap-2 sticky bottom-0 bg-surface">
         <button
@@ -160,6 +286,17 @@ export default function ProposalView({
         </button>
         {canApply && (
           <>
+            <button
+              onClick={() => setRefineOpen((v) => !v)}
+              disabled={busy}
+              className={`text-[0.65rem] font-semibold bg-transparent border rounded px-3 py-1.5 cursor-pointer disabled:opacity-50 transition-colors ${
+                refineOpen
+                  ? "border-brand-white/40 text-brand-white"
+                  : "border-border-mid text-muted hover:text-brand-white"
+              }`}
+            >
+              REFINE
+            </button>
             <button
               onClick={onEdit}
               disabled={busy}

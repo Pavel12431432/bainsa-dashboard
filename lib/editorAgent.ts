@@ -20,17 +20,40 @@ export interface EditorProposal {
   proposedContent: string | null;
 }
 
+export interface RefineContext {
+  previousProposal: EditorProposal;
+  nudge: string;
+}
+
 /** Build the single message we send to Lorenzo.
  *  Wraps the FeedbackBundle in a tagged block and nothing else — the agent's
- *  SOUL.md describes how to interpret it. */
-export function buildProposalPrompt(bundle: FeedbackBundle): string {
-  return [
-    "Review the human feedback bundle below and respond with a JSON proposal as described in your SOUL.md.",
-    "",
-    "<FeedbackBundle>",
-    JSON.stringify(bundle, null, 2),
-    "</FeedbackBundle>",
-  ].join("\n");
+ *  SOUL.md describes how to interpret it.
+ *  When `refine` is provided, appends PreviousProposal + Nudge blocks and a
+ *  refine-mode instruction. */
+export function buildProposalPrompt(bundle: FeedbackBundle, refine?: RefineContext): string {
+  const lines: string[] = [];
+  if (refine) {
+    lines.push("Refine your previous proposal according to the operator's nudge. See 'Refine mode' in your SOUL.md.");
+  } else {
+    lines.push("Review the human feedback bundle below and respond with a JSON proposal as described in your SOUL.md.");
+  }
+  lines.push("");
+  lines.push("<FeedbackBundle>");
+  lines.push(JSON.stringify(bundle, null, 2));
+  lines.push("</FeedbackBundle>");
+
+  if (refine) {
+    lines.push("");
+    lines.push("<PreviousProposal>");
+    lines.push(JSON.stringify(refine.previousProposal, null, 2));
+    lines.push("</PreviousProposal>");
+    lines.push("");
+    lines.push("<Nudge>");
+    lines.push(refine.nudge);
+    lines.push("</Nudge>");
+  }
+
+  return lines.join("\n");
 }
 
 /** Extract the first `{...}` JSON block from the agent's response.
@@ -107,8 +130,9 @@ export function parseProposal(raw: string): EditorProposal {
 export async function runEditorAgent(
   bundle: FeedbackBundle,
   sessionId: string,
+  refine?: RefineContext,
 ): Promise<EditorProposal> {
-  const prompt = buildProposalPrompt(bundle);
+  const prompt = buildProposalPrompt(bundle, refine);
   const raw = await chatWithAgent("lorenzo", sessionId, prompt);
   return parseProposal(raw);
 }

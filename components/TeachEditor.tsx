@@ -42,6 +42,9 @@ export default function TeachEditor({ fixed, adaptive, initialHistory, initialPr
   const [inspectorHighlight, setInspectorHighlight] = useState<string[]>([]);
   const [proposalBusy, setProposalBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Set when the user hit EDIT FIRST on a proposal — the next save should
+   *  be labeled "Edited Lorenzo proposal" rather than generic "Manual edit". */
+  const [pendingSaveLabel, setPendingSaveLabel] = useState<string | null>(null);
 
   const isDirty = content !== savedContent;
 
@@ -50,13 +53,15 @@ export default function TeachEditor({ fixed, adaptive, initialHistory, initialPr
     if (res.ok) setHistory(await res.json());
   }
 
-  async function save(text?: string) {
+  async function save(text?: string, label?: string) {
     const toSave = text ?? content;
+    const finalLabel = label ?? pendingSaveLabel ?? undefined;
     setSaving(true);
     try {
-      const res = await apiFetch("/api/teach/save", { content: toSave });
+      const res = await apiFetch("/api/teach/save", { content: toSave, label: finalLabel });
       if (res.ok) {
         setSavedContent(toSave);
+        setPendingSaveLabel(null);
         await refreshHistory();
       }
     } finally {
@@ -82,7 +87,7 @@ export default function TeachEditor({ fixed, adaptive, initialHistory, initialPr
     const restored = history[viewingIdx].content;
     setViewingIdx(null);
     setContent(restored);
-    await save(restored);
+    await save(restored, "Restored version");
   }
 
   // Proposal actions
@@ -110,6 +115,45 @@ export default function TeachEditor({ fixed, adaptive, initialHistory, initialPr
     } catch (err) {
       setError(`Proposal failed: ${err instanceof Error ? err.message : String(err)}`);
       setMode("normal");
+    }
+  }
+
+  async function refineProposal(nudge: string) {
+    if (!proposal) return;
+    setError(null);
+    setMode("generating");
+    try {
+      const res = await apiFetch("/api/teach/propose/refine", { nudge });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Unknown error" }));
+        setError(`Refine failed: ${err.error || res.statusText}`);
+        setMode("proposal");
+        return;
+      }
+      const data = (await res.json()) as { proposal: StoredProposal };
+      setProposal(data.proposal);
+      setMode("proposal");
+    } catch (err) {
+      setError(`Refine failed: ${err instanceof Error ? err.message : String(err)}`);
+      setMode("proposal");
+    }
+  }
+
+  async function undoRefine() {
+    if (!proposal?.previousProposal) return;
+    setError(null);
+    setProposalBusy(true);
+    try {
+      const res = await apiFetch("/api/teach/propose/undo-refine", {});
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Unknown error" }));
+        setError(`Undo failed: ${err.error || res.statusText}`);
+        return;
+      }
+      const data = (await res.json()) as { proposal: StoredProposal };
+      setProposal(data.proposal);
+    } finally {
+      setProposalBusy(false);
     }
   }
 
@@ -164,6 +208,9 @@ export default function TeachEditor({ fixed, adaptive, initialHistory, initialPr
       setContent(proposal.proposedContent);
       setProposal(null);
       setMode("normal");
+      // Flag the next save so its history entry reads "Edited Lorenzo proposal"
+      // rather than the generic "Manual edit".
+      setPendingSaveLabel("Edited Lorenzo proposal");
       // Do NOT save yet — let the user tweak and hit SAVE themselves.
     } finally {
       setProposalBusy(false);
@@ -182,7 +229,7 @@ export default function TeachEditor({ fixed, adaptive, initialHistory, initialPr
       <div className="shrink-0">
         <h1 className="text-xl font-semibold text-brand-white m-0">Teach Sofia</h1>
         <p className="text-[0.8rem] text-brand-white opacity-35 mt-1">
-          Edit Sofia&apos;s adaptive instructions — style, tone, and copy guidelines
+          Edit Sofia&apos;s style guide directly, or let Lorenzo — her editor — review recent feedback and propose updates.
         </p>
       </div>
 
@@ -304,7 +351,7 @@ export default function TeachEditor({ fixed, adaptive, initialHistory, initialPr
 
           {/* Main panel — switches by mode */}
           {mode === "generating" ? (
-            <GeneratingPanel />
+            <GeneratingPanel refining={proposal !== null} />
           ) : mode === "proposal" && proposal ? (
             <ProposalView
               proposal={proposal}
@@ -312,6 +359,8 @@ export default function TeachEditor({ fixed, adaptive, initialHistory, initialPr
               onAccept={acceptProposal}
               onReject={rejectProposal}
               onEdit={editProposal}
+              onRefine={refineProposal}
+              onUndoRefine={undoRefine}
               onInspect={openInspectorForRefs}
               busy={proposalBusy}
             />
@@ -362,18 +411,19 @@ export default function TeachEditor({ fixed, adaptive, initialHistory, initialPr
   );
 }
 
-function GeneratingPanel() {
+function GeneratingPanel({ refining }: { refining: boolean }) {
   return (
     <div className="w-full flex-1 min-h-0 rounded-lg border border-border-mid bg-surface flex flex-col items-center justify-center gap-4 p-8">
       <div className="flex items-center gap-3">
         <span className="w-2 h-2 rounded-full bg-accent-culture animate-pulse" />
         <span className="text-[0.85rem] text-brand-white/80 font-semibold">
-          Lorenzo is reviewing recent feedback...
+          {refining ? "Lorenzo is refining the proposal..." : "Lorenzo is reviewing recent feedback..."}
         </span>
       </div>
       <p className="text-[0.7rem] text-muted max-w-md text-center leading-relaxed m-0">
-        This usually takes 30–60 seconds. He&apos;s clustering the feedback into themes, checking
-        for conflicts, and drafting a proposal.
+        {refining
+          ? "He's applying your nudge while keeping the rest of the proposal intact. Usually ~30 seconds."
+          : "This usually takes 30–60 seconds. He's clustering the feedback into themes, checking for conflicts, and drafting a proposal."}
       </p>
     </div>
   );

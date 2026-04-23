@@ -3,6 +3,7 @@ import { requireFetch } from "@/lib/apiGuard";
 import { collectFeedback } from "@/lib/editorFeedback";
 import { runEditorAgent } from "@/lib/editorAgent";
 import { readProposal, writeProposal, deleteProposal, StoredProposal } from "@/lib/proposals";
+import { computeFreshWarnings } from "@/lib/proposalWarnings";
 
 export async function GET() {
   const proposal = await readProposal();
@@ -24,12 +25,15 @@ export async function POST(req: NextRequest) {
     const sessionId = `editor-agent-${Date.now()}`;
     const proposal = await runEditorAgent(bundle, sessionId);
 
+    const warnings = computeFreshWarnings(proposal, bundle.currentAdaptive);
+
     const stored: StoredProposal = {
       ...proposal,
       generatedAt: new Date().toISOString(),
       basedOnAdaptive: bundle.currentAdaptive,
       basedOnSummary: bundle.summary,
       windowDays: bundle.windowDays,
+      ...(warnings.length ? { warnings } : {}),
     };
     await writeProposal(stored);
 
