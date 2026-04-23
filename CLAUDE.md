@@ -1,6 +1,6 @@
 # BAINSA Dashboard — Codebase Reference
 
-Read this file instead of exploring the codebase. It is complete and up-to-date as of 2026-04-22.
+Read this file instead of exploring the codebase. It is complete and up-to-date as of 2026-04-23.
 
 ## Demo mode (for teammates / local dev)
 
@@ -148,13 +148,18 @@ Lorenzo is invoked on-demand from the Teach Sofia page ("PROPOSE UPDATES" button
 4. `runEditorAgent()` (`lib/editorAgent.ts`) wraps the bundle in a `<FeedbackBundle>` tagged block and calls `chatWithAgent("lorenzo", sessionId, prompt)` — Lorenzo responds with a single JSON object (`status`, `summary`, `rationale[]`, `conflicts[]`, `proposedContent`)
 5. Route validates the response and writes it to `ADAPTIVE.proposal.json` sidecar (one pending proposal at a time)
 6. UI shows the proposal in `ProposalView`: summary, conflict callout (amber), rationale bullets with clickable signal citations, and a diff vs current ADAPTIVE.md
-7. User clicks ACCEPT → `/api/teach/propose/accept` writes proposedContent to ADAPTIVE.md and records the previous content in `ADAPTIVE.history.json` tagged `source: "editor-agent"` (surfaces as a small "lorenzo" tag in the HistoryTimeline)
-8. User clicks REJECT (or DISMISS for no-changes) → deletes sidecar
-9. User clicks EDIT FIRST → deletes sidecar, pre-fills the textarea with proposedContent for manual tweaking
+7. Server computes warnings (`lib/proposalWarnings.ts`): `significant-shrinkage` when proposedContent is < 50% the length of the base, `unchanged-from-previous` (refine only) when the refine returned identical content. Surfaced as amber pills in `ProposalView`.
+8. User clicks ACCEPT → `/api/teach/propose/accept` writes proposedContent to ADAPTIVE.md and records the previous content in `ADAPTIVE.history.json` tagged `source: "editor-agent"` (surfaces as a small "lorenzo" tag in the HistoryTimeline)
+9. User clicks REJECT (or DISMISS for no-changes) → deletes sidecar
+10. User clicks EDIT FIRST → deletes sidecar, pre-fills the textarea with proposedContent, and sets a one-shot `pendingSaveLabel` so the user's next save is tagged "Edited Lorenzo proposal" in history
+11. User clicks REFINE → inline textarea → nudge → `POST /api/teach/propose/refine` reads the pending sidecar as `previousProposal`, re-collects feedback, and re-runs Lorenzo with `<PreviousProposal>` + `<Nudge>` blocks appended to the prompt. New sidecar carries `refineHistory` (breadcrumb) and a one-level `previousProposal` for undo.
+12. User clicks UNDO (next to breadcrumb) → `POST /api/teach/propose/undo-refine` restores the proposal's `previousProposal` as the new sidecar state (one level only).
 
-**Testing**: `npm run editor-agent:test` runs 5 hand-crafted fixtures (too-corporate, conflicting-signals, weak-signal, stale-rule, happy-path) against the real Lorenzo via OpenClaw CLI and dumps reports to `scripts/editor-agent-output/`. After any SOUL.md tweak, run it and check `git diff scripts/editor-agent-output/`.
+**Testing**:
+- `npm run editor-agent:test` runs 5 hand-crafted fixtures (too-corporate, conflicting-signals, weak-signal, stale-rule, happy-path) against the real Lorenzo via OpenClaw CLI and dumps reports to `scripts/editor-agent-output/`. After any SOUL.md tweak, run it and check `git diff scripts/editor-agent-output/`.
+- `npm run stub-proposal <scenario>` writes a canned proposal sidecar for fast UI iteration without calling Lorenzo. Scenarios: `proposal` / `conflict` / `no-changes` / `stale` / `shrinkage` / `refined`. REJECT/DISMISS in the UI clears it.
 
-**Lorenzo's behavior rules** (enforced in his SOUL.md): cluster feedback into themes before deriving rules; never build a rule from a single signal; preserve existing ADAPTIVE.md verbatim unless directly contradicted; flag conflicts instead of silently picking sides; return `status: "no-changes"` when signal is too weak (this is a respected outcome, not a failure).
+**Lorenzo's behavior rules** (enforced in his SOUL.md): cluster feedback into themes before deriving rules; never build a rule from a single signal; preserve existing ADAPTIVE.md verbatim unless directly contradicted (hard floor: `proposedContent` >= 80% of `currentAdaptive` length); flag conflicts instead of silently picking sides; return `status: "no-changes"` when signal is too weak; on refine, always acknowledge the nudge in the summary's first sentence — never a token cosmetic edit.
 
 ## Environment variables (`.env.local`)
 
@@ -288,11 +293,13 @@ interface ChatMessage {
 | `api/search/route.ts` | `GET ?q=` — searches stories across all dates by headline/body/title/sourceTag. Returns max 20 results. |
 | `api/story-dates/route.ts` | `GET` — returns list of dates that have story files (used by DateNav calendar) |
 | `api/teach/instructions/route.ts` | `GET` — returns `{ fixed, adaptive }` from FIXED.md + ADAPTIVE.md |
-| `api/teach/save/route.ts` | `POST` — writes ADAPTIVE.md, records previous version in history |
+| `api/teach/save/route.ts` | `POST { content, label? }` — writes ADAPTIVE.md, records previous version in history. Client passes explicit labels: `"Restored version"` from RESTORE, `"Edited Lorenzo proposal"` after EDIT FIRST, defaults to `"Manual edit"` for plain saves. |
 | `api/teach/history/route.ts` | `GET/POST` — instruction version history entries |
 | `api/teach/feedback/route.ts` | `GET ?days=14` — returns a `FeedbackBundle` (rejections, edits, variant activity, approvals, current ADAPTIVE.md + last 3 versions) for a rolling window. Used by FeedbackInspector. |
-| `api/teach/propose/route.ts` | `GET` returns current pending proposal or null. `POST { days }` collects feedback, runs Lorenzo, writes proposal sidecar. `DELETE` discards sidecar. |
-| `api/teach/propose/accept/route.ts` | `POST` — writes pending proposal's content to ADAPTIVE.md, snapshots previous content to history tagged `source: "editor-agent"`, deletes sidecar. |
+| `api/teach/propose/route.ts` | `GET` returns current pending proposal or null. `POST { days }` collects feedback, runs Lorenzo fresh, writes proposal sidecar with server-computed `warnings`. `DELETE` discards sidecar. Rejects a `nudge` param with 400 — that's the refine endpoint. |
+| `api/teach/propose/refine/route.ts` | `POST { nudge }` — requires a pending proposal. Re-collects feedback, re-runs Lorenzo with `<PreviousProposal>` + `<Nudge>` blocks, writes new sidecar with appended `refineHistory` and a one-level `previousProposal` slot. Returns 400 if no pending proposal. |
+| `api/teach/propose/undo-refine/route.ts` | `POST` — restores `proposal.previousProposal` as the new sidecar state and pops the last `refineHistory` entry. One level only; undoing twice requires regenerating. |
+| `api/teach/propose/accept/route.ts` | `POST` — writes pending proposal's content to ADAPTIVE.md, snapshots previous content to history tagged `source: "editor-agent"`, best-effort deletes sidecar (self-healed by `readProposal` if delete fails). |
 | `api/auth/logout/route.ts` | `GET` — deletes auth cookie, redirects to `/login` |
 
 ### Components (`components/`)
@@ -316,9 +323,10 @@ interface ChatMessage {
 | `ChatMessages.tsx` | Shared message list + input area. Used by StoryChat and AgentChat. Renders message bubbles, loading indicator ("X is thinking..."), empty state, textarea + send button. Accepts `emptyState`, `footer`, `disabled`/`disabledMessage`, `loadingText`, `placeholder`, and optional `inputRef` so the parent can control focus/height. |
 | `DateNav.tsx` | Date navigation with `<Link prefetch>`. Calendar picker that grays out dates with no stories (fetches from `/api/story-dates`). |
 | `ComplianceBadge.tsx` | Card overlay showing failing compliance checks as red chips. Hover shows detail tooltip (centered, z-50). Badge tints red on hover for feedback. |
-| `TeachEditor.tsx` | Client component for the Teach Sofia page. Two-column layout: collapsible read-only FIXED.md (left), editable ADAPTIVE.md (right). Right column is a 3-mode state machine: **normal** (textarea + Ctrl+S + "PROPOSE UPDATES" button), **generating** (pulsing dot + "Lorenzo is reviewing..."), **proposal** (renders `<ProposalView>` with ACCEPT / EDIT FIRST / REJECT). Version history below via `<HistoryTimeline>` with line-by-line diff view + restore. EDIT FIRST deletes the proposal sidecar and drops the user into normal mode pre-filled with Lorenzo's content. |
+| `TeachEditor.tsx` | Client component for the Teach Sofia page. Two-column layout: collapsible read-only FIXED.md (left), editable ADAPTIVE.md (right). Right column is a 3-mode state machine: **normal** (textarea + Ctrl+S + "PROPOSE UPDATES" button), **generating** (pulsing dot + "Lorenzo is reviewing..." / "...refining..."), **proposal** (renders `<ProposalView>`). Version history below via `<HistoryTimeline>` with line-by-line diff view + restore. `save(content, label?)` threads the label to the API; restore uses `"Restored version"`, EDIT FIRST sets `pendingSaveLabel: "Edited Lorenzo proposal"` so the *next* manual save reads correctly. EDIT FIRST deletes the proposal sidecar and drops the user into normal mode pre-filled with Lorenzo's content. Dismissible red error banner replaces `alert()` for proposal/accept/refine failures. |
 | `FeedbackInspector.tsx` | Modal opened from TeachEditor. Shows 7/14/30-day window selector, summary pills (approvals/rejections/edits/variants), tabbed signal list (rejections/edits/variants/approvals) with expandable rows showing full detail (rejection reason, before/after diffs for edits, etc.). Before generation: "GENERATE PROPOSAL" button. After generation (review-only mode): accepts `highlightRefs` from ProposalView rationale/conflict clicks to pre-expand and visually highlight matching rows. |
-| `ProposalView.tsx` | Renders a pending Lorenzo proposal: header with time-ago + window + signal counts, amber conflict callout (if any), bulleted rationale with clickable `[rejection-0, edit-2]` citation links (call `onInspect(refs)`), inline diff vs current ADAPTIVE.md, ACCEPT/EDIT FIRST/REJECT sticky footer. Stale amber banner when `basedOnAdaptive !== currentAdaptive`. For `status: "no-changes"`, renders a centered "Lorenzo is leaving things alone" message with only a DISMISS button. |
+| `ProposalView.tsx` | Renders a pending Lorenzo proposal: header with time-ago + window + signal counts, refine breadcrumb (`REFINED N×  "nudge1" → "nudge2"` with UNDO button when `previousProposal` is present), amber warnings pills (shrinkage / unchanged-from-previous), amber conflict callout (if any), summary, bulleted rationale with clickable `[rejection-0, edit-2]` citation links (call `onInspect(refs)`), inline diff vs current ADAPTIVE.md via `<DiffBlock>`, sticky footer with REJECT / REFINE / EDIT FIRST / ACCEPT. REFINE opens an inline textarea (autoscrolled into view, focus restored); submitting calls `onRefine(nudge)`. On any proposal change (generatedAt), the panel auto-scrolls to top so the updated summary is the first thing visible — critical when refine returns near-identical content. Stale amber banner when `basedOnAdaptive !== currentAdaptive`. For `status: "no-changes"`, renders a centered "Lorenzo is leaving things alone" message with only a DISMISS button. |
+| `DiffBlock.tsx` | Shared LCS-diff renderer used by TeachEditor (history diff) and ProposalView (proposal diff). Props: `lines: DiffLine[]`, `inset: "x-3" \| "x-4"` for the pull-out padding, optional `className`. Uses NBSP for empty lines. |
 | `ExportDialog.tsx` | Modal for selecting stories to export as PNG (ZIP or individual). Custom dark checkboxes. Smart pre-selection: approved stories if any, otherwise all. "Approved only" quick filter. Uses html2canvas-pro for rendering + JSZip for bundling. |
 
 ### Lib (`lib/`)
@@ -340,8 +348,9 @@ interface ChatMessage {
 | `history.ts` | Story version history sidecars. Thin wrapper over `versionHistory.ts` using keyed storage (`story index -> entries[]`). Applies `STORY_DEFAULTS` migration on read for fields added after existing history was written. |
 | `instructionHistory.ts` | ADAPTIVE.md version history (`ADAPTIVE.history.json`). Thin wrapper over `versionHistory.ts` using flat storage. Entries carry an optional `source: "human" \| "editor-agent"` field (absent on legacy entries; treat as human). `addInstructionHistory(content, label, source?)` defaults source to `"human"`. |
 | `editorFeedback.ts` | `collectFeedback(windowDays)` assembles a typed `FeedbackBundle` by scanning STORIES_PATH for story files within the window, reading approval sidecars, history sidecars (first vs last entry diff → edit signals), and variants sidecars. Also reads current ADAPTIVE.md and the last 3 versions from ADAPTIVE.history.json. Powers `/api/teach/feedback` and the propose route. |
-| `editorAgent.ts` | Lorenzo client. `buildProposalPrompt(bundle)` wraps the bundle in a `<FeedbackBundle>` tagged block. `parseProposal(raw)` tolerates ```json fences + stray preamble, validates status/summary/rationale/conflicts/proposedContent, enforces that no-changes has null content and proposal has content. `runEditorAgent(bundle, sessionId)` chains them via `chatWithAgent("lorenzo", ...)`. Types: `EditorProposal`, `RationaleBullet`, `Conflict`. |
-| `proposals.ts` | Read/write/delete `ADAPTIVE.proposal.json` sidecar in `SOFIA_INSTRUCTIONS_PATH`. `StoredProposal` extends `EditorProposal` with `generatedAt`, `basedOnAdaptive` (full content string, for stale detection), `basedOnSummary` (feedback counts), `windowDays`. Only one pending proposal at a time. |
+| `editorAgent.ts` | Lorenzo client. `buildProposalPrompt(bundle, refine?)` wraps the bundle in a `<FeedbackBundle>` tagged block; when `refine: { previousProposal, nudge }` is supplied, also appends `<PreviousProposal>` + `<Nudge>` blocks. `parseProposal(raw)` tolerates ```json fences + stray preamble, validates status/summary/rationale/conflicts/proposedContent, enforces that no-changes has null content and proposal has content. `runEditorAgent(bundle, sessionId, refine?)` chains them via `chatWithAgent("lorenzo", ...)`. Types: `EditorProposal`, `RationaleBullet`, `Conflict`, `RefineContext`. |
+| `proposals.ts` | Read/write/delete `ADAPTIVE.proposal.json` sidecar in `SOFIA_INSTRUCTIONS_PATH`. `StoredProposal` extends `EditorProposal` with `generatedAt`, `basedOnAdaptive` (full content string, for stale detection), `basedOnSummary` (feedback counts), `windowDays`, optional `warnings: ProposalWarning[]` (server-computed), optional `refineHistory: RefineTurn[]` (breadcrumb), and optional `previousProposal` (one-level undo slot, `Omit<StoredProposal, "previousProposal">` to keep the sidecar bounded). `readProposal` self-heals: if `proposedContent` already equals live ADAPTIVE.md, the sidecar is deleted silently and `null` returned. Only one pending proposal at a time. |
+| `proposalWarnings.ts` | `computeFreshWarnings(proposal, currentAdaptive)` and `computeRefineWarnings(proposal, previous)` — server-side checks run after each Lorenzo response. Flags `significant-shrinkage` when `proposedContent` is under 50% of the base length, and `unchanged-from-previous` (refine only) when content is byte-identical. The UI renders each warning as an amber pill with copy defined in `ProposalView`. |
 | `time.ts` | `timeAgo(iso)` — "5m ago" / "2h ago" / "3d ago" formatter. Used by `HistoryTimeline`. |
 | `diff.ts` | Simple LCS-based line diff. Returns `{ type: "same" \| "added" \| "removed", line }[]`. Used by TeachEditor history diff view, ProposalView proposal diff, and the `editor-agent:test` harness. |
 | `storyUtils.ts` | Shared story helpers: `applyUpdates()`, `diffFields()`, `storyEqual()`, `COMPARABLE_KEYS`, `FIELD_LABELS`, `TEXT_FIELDS`, `DESIGN_FIELDS`, `VARIANT_FIELDS` (single source of truth — union of text+design, imported by openclaw.ts + ExploreView.tsx), `variantToPatch(variant, mode)` for apply-all/text-only/design-only. Used by StoryEditor, StoryChat, StoryGrid, ExploreView. |
@@ -402,11 +411,14 @@ TeachEditor (full page at /teach)
 │   ├── normal: textarea + Ctrl+S save + "PROPOSE UPDATES" button
 │   ├── generating: pulsing dot + "Lorenzo is reviewing..."
 │   └── proposal → ProposalView
+│       ├── header + refine breadcrumb (REFINED N× … with UNDO)
+│       ├── warnings pills (amber: shrinkage / unchanged-from-previous)
 │       ├── summary + stale banner (if ADAPTIVE changed since gen)
 │       ├── conflicts callout (amber)
 │       ├── rationale bullets with citation click-through
-│       ├── diff vs current ADAPTIVE.md
-│       └── ACCEPT / EDIT FIRST / REJECT
+│       ├── diff vs current ADAPTIVE.md (DiffBlock)
+│       ├── inline REFINE form (textarea, autoscrolled into view)
+│       └── REJECT / REFINE / EDIT FIRST / ACCEPT
 ├── FeedbackInspector (modal, opened from PROPOSE UPDATES or rationale click-through)
 │   ├── 7/14/30d window selector
 │   ├── summary pills
