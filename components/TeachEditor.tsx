@@ -101,6 +101,7 @@ export default function TeachEditor({ fixed, adaptive, initialHistory, initialPr
     setError(null);
     setMode("generating");
     setInspectorOpen(false);
+    setPendingSaveLabel(null);
     try {
       const res = await apiFetch("/api/teach/propose", { days });
       if (!res.ok) {
@@ -175,6 +176,7 @@ export default function TeachEditor({ fixed, adaptive, initialHistory, initialPr
       }
       setProposal(null);
       setMode("normal");
+      setPendingSaveLabel(null);
       await refreshHistory();
     } finally {
       setProposalBusy(false);
@@ -182,14 +184,21 @@ export default function TeachEditor({ fixed, adaptive, initialHistory, initialPr
   }
 
   async function rejectProposal() {
+    setError(null);
     setProposalBusy(true);
     try {
-      await fetch("/api/teach/propose", {
+      const res = await fetch("/api/teach/propose", {
         method: "DELETE",
         headers: { "X-Requested-With": "fetch" },
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Unknown error" }));
+        setError(`Dismiss failed: ${err.error || res.statusText}`);
+        return;
+      }
       setProposal(null);
       setMode("normal");
+      setPendingSaveLabel(null);
     } finally {
       setProposalBusy(false);
     }
@@ -199,12 +208,18 @@ export default function TeachEditor({ fixed, adaptive, initialHistory, initialPr
     if (!proposal?.proposedContent) return;
     // Drop into normal edit mode, pre-filled with the proposed content.
     // Also discard the sidecar — once the user edits, the proposal is consumed.
+    setError(null);
     setProposalBusy(true);
     try {
-      await fetch("/api/teach/propose", {
+      const res = await fetch("/api/teach/propose", {
         method: "DELETE",
         headers: { "X-Requested-With": "fetch" },
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Unknown error" }));
+        setError(`Could not consume proposal: ${err.error || res.statusText}`);
+        return;
+      }
       setContent(proposal.proposedContent);
       setProposal(null);
       setMode("normal");

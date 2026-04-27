@@ -137,21 +137,28 @@ export default function ProposalView({
       )}
 
       {/* No-changes centered message */}
-      {proposal.status === "no-changes" && (
-        <div className="flex flex-col items-center justify-center text-center gap-3 px-6 py-10">
-          <div className="text-[0.75rem] font-semibold text-brand-white/80">
-            Lorenzo is leaving things alone
-          </div>
-          {proposal.summary && (
-            <p className="text-[0.7rem] text-brand-white/60 leading-relaxed max-w-md m-0">
-              {proposal.summary}
+      {proposal.status === "no-changes" && (() => {
+        const isRefine = (proposal.refineHistory?.length ?? 0) > 0;
+        return (
+          <div className="flex flex-col items-center justify-center text-center gap-3 px-6 py-10">
+            <div className="text-[0.75rem] font-semibold text-brand-white/80">
+              {isRefine
+                ? "Lorenzo didn't change the proposal"
+                : "Lorenzo is leaving things alone"}
+            </div>
+            {proposal.summary && (
+              <p className="text-[0.7rem] text-brand-white/60 leading-relaxed max-w-md m-0">
+                {proposal.summary}
+              </p>
+            )}
+            <p className="text-[0.65rem] text-muted m-0">
+              {isRefine
+                ? "Your nudge didn't move him. Use UNDO above to get the previous proposal back, or dismiss."
+                : "Come back after more feedback accumulates, or dismiss to remove this notice."}
             </p>
-          )}
-          <p className="text-[0.65rem] text-muted m-0">
-            Come back after more feedback accumulates, or dismiss to remove this notice.
-          </p>
-        </div>
-      )}
+          </div>
+        );
+      })()}
 
       {/* Summary (only when there's a proposal to explain) */}
       {proposal.status === "proposal" && proposal.summary && (
