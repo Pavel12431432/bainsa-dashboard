@@ -37,6 +37,10 @@ export interface StoredProposal extends EditorProposal {
    *  proposal is the result of a refine. Enables one-shot UNDO REFINE — we
    *  deliberately only keep one level to avoid unbounded recursion. */
   previousProposal?: Omit<StoredProposal, "previousProposal">;
+  /** Free-text instruction the operator typed before generating. Lets the
+   *  proposal panel show a breadcrumb of what was asked for. Fresh
+   *  generations only — refines use refineHistory.nudge instead. */
+  operatorFocus?: string;
 }
 
 function proposalPath(): string {

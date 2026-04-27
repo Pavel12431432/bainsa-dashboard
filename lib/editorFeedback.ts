@@ -97,12 +97,35 @@ async function readCurrentAdaptive(): Promise<string> {
 
 /** Collect human-feedback signals on Sofia's stories over a rolling window.
  *  Filters by story date (the date of the story file), not activity timestamp —
- *  simpler and matches "recent Sofia output." */
+ *  simpler and matches "recent Sofia output."
+ *  windowDays === 0 means "no feedback at all" — pairs with operator focus
+ *  mode when the operator wants Lorenzo to work purely from their instruction
+ *  without dragging in unrelated signals. We still return currentAdaptive +
+ *  history so Lorenzo has something to base his edit on. */
 export async function collectFeedback(windowDays: number): Promise<FeedbackBundle> {
   const today = new Date();
   const to = today.toISOString().slice(0, 10);
-  const from = daysAgo(today, windowDays - 1);
 
+  if (windowDays === 0) {
+    const instructionHistory = await readInstructionHistory();
+    return {
+      windowDays: 0,
+      dateRange: { from: to, to },
+      summary: {
+        approvals: 0,
+        rejections: 0,
+        edits: 0,
+        variantsApplied: 0,
+        variantsDisliked: 0,
+        datesCovered: 0,
+      },
+      signals: { rejections: [], edits: [], variantActivity: [], approvals: [] },
+      currentAdaptive: await readCurrentAdaptive(),
+      adaptiveHistory: [...instructionHistory].reverse().slice(0, 3),
+    };
+  }
+
+  const from = daysAgo(today, windowDays - 1);
   const dates = await listStoryDatesInWindow(from, to);
 
   const rejections: RejectionSignal[] = [];

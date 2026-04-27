@@ -92,6 +92,19 @@ export default function ProposalView({
         )}
       </div>
 
+      {/* Operator focus breadcrumb (fresh-generation input). Stays visible
+          even after refines so the user remembers what they originally asked. */}
+      {proposal.operatorFocus && (
+        <div className="px-4 py-2 border-b border-border-mid bg-surface-2/40 flex items-start gap-2">
+          <span className="text-[0.55rem] uppercase tracking-[0.08em] text-muted font-semibold shrink-0 mt-[2px]">
+            Focus
+          </span>
+          <span className="text-[0.65rem] text-brand-white/80 flex-1 leading-relaxed italic">
+            &ldquo;{proposal.operatorFocus}&rdquo;
+          </span>
+        </div>
+      )}
+
       {/* Refine breadcrumb */}
       {proposal.refineHistory && proposal.refineHistory.length > 0 && (
         <div className="px-4 py-2 border-b border-border-mid bg-surface-2/40 flex items-start gap-2">

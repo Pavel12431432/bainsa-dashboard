@@ -50,6 +50,9 @@ export async function POST(req: NextRequest) {
       windowDays: bundle.windowDays,
       refineHistory: [...(previous.refineHistory ?? []), turn],
       previousProposal: previousFlat,
+      // Carry operatorFocus forward — if the fresh generation had a focus,
+      // the breadcrumb should still show it after refines.
+      ...(previous.operatorFocus ? { operatorFocus: previous.operatorFocus } : {}),
       ...(warnings.length ? { warnings } : {}),
     };
     await writeProposal(stored);

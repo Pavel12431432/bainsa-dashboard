@@ -29,11 +29,20 @@ export interface RefineContext {
  *  Wraps the FeedbackBundle in a tagged block and nothing else — the agent's
  *  SOUL.md describes how to interpret it.
  *  When `refine` is provided, appends PreviousProposal + Nudge blocks and a
- *  refine-mode instruction. */
-export function buildProposalPrompt(bundle: FeedbackBundle, refine?: RefineContext): string {
+ *  refine-mode instruction.
+ *  When `operatorFocus` is provided (fresh generations only), appends an
+ *  OperatorFocus block — Lorenzo treats it as a forcing instruction (must
+ *  produce a proposal, must address the focus). */
+export function buildProposalPrompt(
+  bundle: FeedbackBundle,
+  refine?: RefineContext,
+  operatorFocus?: string,
+): string {
   const lines: string[] = [];
   if (refine) {
     lines.push("Refine your previous proposal according to the operator's nudge. See 'Refine mode' in your SOUL.md.");
+  } else if (operatorFocus) {
+    lines.push("Review the human feedback bundle below AND the operator's focus. See 'Operator focus mode' in your SOUL.md — you must produce a proposal that addresses the focus.");
   } else {
     lines.push("Review the human feedback bundle below and respond with a JSON proposal as described in your SOUL.md.");
   }
@@ -51,6 +60,11 @@ export function buildProposalPrompt(bundle: FeedbackBundle, refine?: RefineConte
     lines.push("<Nudge>");
     lines.push(refine.nudge);
     lines.push("</Nudge>");
+  } else if (operatorFocus) {
+    lines.push("");
+    lines.push("<OperatorFocus>");
+    lines.push(operatorFocus);
+    lines.push("</OperatorFocus>");
   }
 
   return lines.join("\n");
@@ -131,8 +145,9 @@ export async function runEditorAgent(
   bundle: FeedbackBundle,
   sessionId: string,
   refine?: RefineContext,
+  operatorFocus?: string,
 ): Promise<EditorProposal> {
-  const prompt = buildProposalPrompt(bundle, refine);
+  const prompt = buildProposalPrompt(bundle, refine, operatorFocus);
   const raw = await chatWithAgent("lorenzo", sessionId, prompt);
   return parseProposal(raw);
 }

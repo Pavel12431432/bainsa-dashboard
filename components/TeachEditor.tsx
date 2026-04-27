@@ -97,13 +97,13 @@ export default function TeachEditor({ fixed, adaptive, initialHistory, initialPr
     setInspectorOpen(true);
   }
 
-  async function generateProposal(days: number) {
+  async function generateProposal(days: number, focus?: string) {
     setError(null);
     setMode("generating");
     setInspectorOpen(false);
     setPendingSaveLabel(null);
     try {
-      const res = await apiFetch("/api/teach/propose", { days });
+      const res = await apiFetch("/api/teach/propose", { days, focus });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Unknown error" }));
         setError(`Proposal failed: ${err.error || res.statusText}`);

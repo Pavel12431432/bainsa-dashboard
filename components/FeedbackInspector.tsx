@@ -8,7 +8,7 @@ type TabKey = "rejections" | "edits" | "variants" | "approvals";
 interface Props {
   open: boolean;
   onClose: () => void;
-  onGenerate: (days: number) => void;
+  onGenerate: (days: number, focus?: string) => void;
   generating: boolean;
   /** When provided, the inspector is in "review mode" (after generation):
    *  highlights these signal refs and pre-selects the matching tab. */
@@ -17,7 +17,10 @@ interface Props {
   reviewOnly?: boolean;
 }
 
-const WINDOW_OPTIONS = [7, 14, 30] as const;
+const FOCUS_MAX = 500;
+
+const WINDOW_OPTIONS = [7, 14, 30, 0] as const;
+const WINDOW_LABEL: Record<number, string> = { 0: "None", 7: "7d", 14: "14d", 30: "30d" };
 
 function tabForRef(ref: string): TabKey | null {
   if (ref.startsWith("rejection-")) return "rejections";
@@ -45,6 +48,13 @@ export default function FeedbackInspector({
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>("rejections");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [focus, setFocus] = useState<string>("");
+
+  // Reset focus whenever the inspector closes — focus is one-shot, not
+  // persisted across sessions or re-opens.
+  useEffect(() => {
+    if (!open) setFocus("");
+  }, [open]);
 
   // When opened with highlights, jump to the right tab.
   useEffect(() => {
@@ -104,9 +114,11 @@ export default function FeedbackInspector({
               {reviewOnly ? "Feedback inspector" : "Review feedback before generating"}
             </h2>
             <p className="text-[0.65rem] text-muted m-0 mt-1">
-              {bundle
-                ? `${bundle.dateRange.from} → ${bundle.dateRange.to} · ${bundle.summary.datesCovered} day${bundle.summary.datesCovered === 1 ? "" : "s"} with stories`
-                : "Loading..."}
+              {!bundle
+                ? "Loading..."
+                : days === 0
+                  ? "No feedback included — Lorenzo will only see the current ADAPTIVE.md and your focus."
+                  : `${bundle.dateRange.from} → ${bundle.dateRange.to} · ${bundle.summary.datesCovered} day${bundle.summary.datesCovered === 1 ? "" : "s"} with stories`}
             </p>
           </div>
           <button
@@ -135,8 +147,9 @@ export default function FeedbackInspector({
                       ? "bg-brand-white text-brand-black border-brand-white"
                       : "bg-transparent text-muted border-border-mid hover:text-brand-white"
                   } ${reviewOnly ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                  title={n === 0 ? "Skip feedback — Lorenzo only sees the focus and current ADAPTIVE.md" : undefined}
                 >
-                  {n}d
+                  {WINDOW_LABEL[n] ?? `${n}d`}
                 </button>
               ))}
             </div>
@@ -152,40 +165,52 @@ export default function FeedbackInspector({
           )}
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 px-5 pt-3 border-b border-border-mid shrink-0">
-          {(["rejections", "edits", "variants", "approvals"] as TabKey[]).map((tab) => {
-            const count = bundle
-              ? tab === "rejections"
-                ? bundle.signals.rejections.length
-                : tab === "edits"
-                  ? bundle.signals.edits.length
-                  : tab === "variants"
-                    ? bundle.signals.variantActivity.length
-                    : bundle.signals.approvals.length
-              : 0;
-            return (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`text-[0.65rem] font-semibold uppercase tracking-[0.08em] px-3 py-2 border-b-2 -mb-px transition-colors cursor-pointer bg-transparent ${
-                  activeTab === tab
-                    ? "border-brand-white text-brand-white"
-                    : "border-transparent text-muted hover:text-brand-white"
-                }`}
-              >
-                {tab} ({count})
-              </button>
-            );
-          })}
-        </div>
+        {/* Tabs — hidden when None is selected since every tab would be empty */}
+        {days !== 0 && (
+          <div className="flex gap-1 px-5 pt-3 border-b border-border-mid shrink-0">
+            {(["rejections", "edits", "variants", "approvals"] as TabKey[]).map((tab) => {
+              const count = bundle
+                ? tab === "rejections"
+                  ? bundle.signals.rejections.length
+                  : tab === "edits"
+                    ? bundle.signals.edits.length
+                    : tab === "variants"
+                      ? bundle.signals.variantActivity.length
+                      : bundle.signals.approvals.length
+                : 0;
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`text-[0.65rem] font-semibold uppercase tracking-[0.08em] px-3 py-2 border-b-2 -mb-px transition-colors cursor-pointer bg-transparent ${
+                    activeTab === tab
+                      ? "border-brand-white text-brand-white"
+                      : "border-transparent text-muted hover:text-brand-white"
+                  }`}
+                >
+                  {tab} ({count})
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Body */}
         <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">
           {loading && !bundle && (
             <p className="text-[0.75rem] text-muted">Loading feedback...</p>
           )}
-          {bundle && (
+          {bundle && days === 0 && (
+            <div className="h-full flex flex-col items-center justify-center text-center gap-2 px-6 py-10">
+              <p className="text-[0.8rem] text-brand-white/70 m-0">
+                No feedback included.
+              </p>
+              <p className="text-[0.7rem] text-muted m-0 max-w-md leading-relaxed">
+                Lorenzo will only see the current ADAPTIVE.md and your focus. Type a focus below to tell him what to change.
+              </p>
+            </div>
+          )}
+          {bundle && days !== 0 && (
             <InspectorList
               bundle={bundle}
               tab={activeTab}
@@ -197,28 +222,82 @@ export default function FeedbackInspector({
         </div>
 
         {/* Footer */}
-        {!reviewOnly && (
-          <div className="flex justify-end gap-2 px-5 py-4 border-t border-border-mid shrink-0">
-            <button
-              onClick={onClose}
-              disabled={generating}
-              className="text-[0.7rem] font-semibold text-muted bg-transparent border border-border-mid rounded px-3 py-1.5 cursor-pointer hover:text-brand-white disabled:opacity-50"
-            >
-              CANCEL
-            </button>
-            <button
-              onClick={() => onGenerate(days)}
-              disabled={generating || !bundle}
-              className={`text-[0.7rem] font-semibold tracking-[0.04em] rounded px-4 py-1.5 transition-all ${
-                generating || !bundle
-                  ? "bg-border-mid text-muted cursor-not-allowed"
-                  : "bg-brand-white text-brand-black cursor-pointer"
-              }`}
-            >
-              {generating ? "LORENZO IS THINKING..." : "GENERATE PROPOSAL"}
-            </button>
-          </div>
-        )}
+        {!reviewOnly && (() => {
+          const trimmedFocus = focus.trim();
+          const focusRequired = days === 0;
+          const focusMissing = focusRequired && !trimmedFocus;
+          const tooLong = focus.length > FOCUS_MAX;
+          const canGenerate = !generating && !!bundle && !tooLong && !focusMissing;
+          return (
+            <div className="flex flex-col gap-3 px-5 py-4 border-t border-border-mid shrink-0">
+              <div>
+                <div className="flex items-baseline justify-between mb-1.5">
+                  <label
+                    htmlFor="lorenzo-focus"
+                    className="text-[0.55rem] font-semibold uppercase tracking-[0.08em] text-muted"
+                  >
+                    Focus{" "}
+                    {focusMissing ? (
+                      <span className="text-amber-400 font-semibold normal-case tracking-normal">
+                        (required — no feedback selected)
+                      </span>
+                    ) : !focusRequired ? (
+                      <span className="text-muted/60 normal-case tracking-normal">(optional)</span>
+                    ) : null}
+                  </label>
+                  <span className={`text-[0.55rem] tabular-nums ${tooLong ? "text-danger" : "text-muted"}`}>
+                    {focus.length}/{FOCUS_MAX}
+                  </span>
+                </div>
+                <textarea
+                  id="lorenzo-focus"
+                  value={focus}
+                  onChange={(e) => setFocus(e.target.value)}
+                  placeholder={
+                    focusRequired
+                      ? "Tell Lorenzo exactly what to change — without feedback he needs a focus to act on."
+                      : "Tell Lorenzo what to focus on — e.g. “tighten headline length rules” or “add guidance on quote cards”. Leave empty to let him pick."
+                  }
+                  rows={2}
+                  disabled={generating}
+                  spellCheck={false}
+                  className="w-full rounded-md border border-border-mid bg-surface-2 text-[0.75rem] text-brand-white/85 p-2.5 resize-none focus:outline-none focus:border-brand-white/40 placeholder:text-muted disabled:opacity-50"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                      e.preventDefault();
+                      if (canGenerate) onGenerate(days, trimmedFocus || undefined);
+                    }
+                  }}
+                />
+                {focusMissing && (
+                  <p className="text-[0.6rem] text-muted mt-1.5 m-0">
+                    No feedback selected — Lorenzo will work purely from your focus and the current ADAPTIVE.md.
+                  </p>
+                )}
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={onClose}
+                  disabled={generating}
+                  className="text-[0.7rem] font-semibold text-muted bg-transparent border border-border-mid rounded px-3 py-1.5 cursor-pointer hover:text-brand-white disabled:opacity-50"
+                >
+                  CANCEL
+                </button>
+                <button
+                  onClick={() => onGenerate(days, trimmedFocus || undefined)}
+                  disabled={!canGenerate}
+                  className={`text-[0.7rem] font-semibold tracking-[0.04em] rounded px-4 py-1.5 transition-all ${
+                    !canGenerate
+                      ? "bg-border-mid text-muted cursor-not-allowed"
+                      : "bg-brand-white text-brand-black cursor-pointer"
+                  }`}
+                >
+                  {generating ? "LORENZO IS THINKING..." : "GENERATE PROPOSAL"}
+                </button>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
