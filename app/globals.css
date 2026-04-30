@@ -129,3 +129,13 @@ body {
   animation: highlight-fade 2s ease-out forwards;
   border-radius: 16px;
 }
+
+/* ── Toast slide-in ─────────────────────────────────────────── */
+@keyframes toast-in {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.toast-in {
+  animation: toast-in 200ms ease-out;
+}

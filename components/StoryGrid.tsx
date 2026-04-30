@@ -61,6 +61,13 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
   const [approvals, setApprovals] = useState<ApprovalState>(initialApprovals);
   const [editing, setEditing] = useState<Story | null>(null);
   const [showExport, setShowExport] = useState(false);
+  const [toast, setToast] = useState<string>("");
+
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(""), 4000);
+    return () => clearTimeout(id);
+  }, [toast]);
   const [stale, setStale] = useState<string | null>(null); // Marco's lastRun if stale
   useSyncExternalStore(subscribeRegen, getRegenSnapshot);
   const regenerating = isRegenerating(date);
@@ -502,7 +509,17 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
           approvedIndices={approvals.approved}
           date={date}
           onClose={() => setShowExport(false)}
+          onSuccess={setToast}
         />
+      )}
+
+      {toast && (
+        <div className="toast-in fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] px-4 py-3 rounded-lg border border-success/40 bg-surface-2/95 backdrop-blur shadow-lg flex items-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0">
+            <path d="M3 7l3 3 5-6" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <p className="text-[0.75rem] text-brand-white leading-snug">{toast}</p>
+        </div>
       )}
     </>
   );

@@ -1,25 +1,57 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Story } from "@/types";
-import { captureStories } from "@/lib/exportCards";
+import { captureStories, captureStoryToBlob } from "@/lib/exportCards";
 
 interface Props {
   stories: Story[];
   approvedIndices?: number[];
   date: string;
   onClose: () => void;
+  onSuccess?: (message: string) => void;
 }
 
-export default function ExportDialog({ stories, approvedIndices = [], date, onClose }: Props) {
+type Destination = "download" | "instagram";
+
+interface Prefs {
+  destination: Destination;
+  format: "zip" | "individual";
+}
+
+const PREFS_KEY = "bainsa-export-prefs";
+const DEFAULT_PREFS: Prefs = { destination: "download", format: "zip" };
+
+function loadPrefs(): Prefs {
+  if (typeof window === "undefined") return DEFAULT_PREFS;
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    if (!raw) return DEFAULT_PREFS;
+    const parsed = JSON.parse(raw) as Partial<Prefs>;
+    return { ...DEFAULT_PREFS, ...parsed };
+  } catch {
+    return DEFAULT_PREFS;
+  }
+}
+
+export default function ExportDialog({ stories, approvedIndices = [], date, onClose, onSuccess }: Props) {
   const [selected, setSelected] = useState<Set<number>>(() => {
-    // Pre-select approved stories if any, otherwise select all
     if (approvedIndices.length > 0) return new Set(approvedIndices);
     return new Set(stories.map((s) => s.index));
   });
-  const [format, setFormat] = useState<"zip" | "individual">("zip");
+  const [destination, setDestination] = useState<Destination>(() => loadPrefs().destination);
+  const [format, setFormat] = useState<"zip" | "individual">(() => loadPrefs().format);
   const [exporting, setExporting] = useState(false);
+  // progress.current is fractional (e.g. 1.4 = 1 done + 40% through 2nd)
   const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const [statusMsg, setStatusMsg] = useState<string>("");
+  const [errorMsg, setErrorMsg] = useState<string>("");
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(PREFS_KEY, JSON.stringify({ destination, format }));
+    } catch {}
+  }, [destination, format]);
 
   function toggle(index: number) {
     setSelected((prev) => {
@@ -32,7 +64,7 @@ export default function ExportDialog({ stories, approvedIndices = [], date, onCl
   function selectAll() { setSelected(new Set(stories.map((s) => s.index))); }
   function deselectAll() { setSelected(new Set()); }
 
-  async function handleExport() {
+  async function handleDownload() {
     const toExport = stories.filter((s) => selected.has(s.index));
     if (toExport.length === 0) return;
 
@@ -49,6 +81,67 @@ export default function ExportDialog({ stories, approvedIndices = [], date, onCl
     }
   }
 
+  async function handleInstagram() {
+    const toPost = stories.filter((s) => selected.has(s.index));
+    if (toPost.length === 0) return;
+
+    setExporting(true);
+    setErrorMsg("");
+    setStatusMsg("");
+    setProgress({ current: 0, total: toPost.length });
+
+    for (let i = 0; i < toPost.length; i++) {
+      const story = toPost[i];
+
+      // Trickle the bar from i toward i+0.9 while the request is in flight.
+      // Snap to i+1 when the request completes — bar always moving, never lying about being done.
+      let sub = 0;
+      const trickle = setInterval(() => {
+        sub = Math.min(0.9, sub + (0.9 - sub) * 0.04);
+        setProgress({ current: i + sub, total: toPost.length });
+      }, 200);
+
+      setStatusMsg(`Rendering story ${story.index}…`);
+      try {
+        const blob = await captureStoryToBlob(story, "image/jpeg", 8 / 3);
+        setStatusMsg(`Posting story ${story.index} to Instagram…`);
+        const res = await fetch(`/api/instagram/publish`, {
+          method: "POST",
+          headers: { "Content-Type": "image/jpeg", "X-Requested-With": "fetch" },
+          body: blob,
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          let detail = text;
+          try {
+            const data = JSON.parse(text);
+            if (data.error) detail = data.error;
+          } catch {}
+          throw new Error(`HTTP ${res.status} — ${detail.slice(0, 300) || "(empty body)"}`);
+        }
+        clearInterval(trickle);
+        setProgress({ current: i + 1, total: toPost.length });
+      } catch (err) {
+        clearInterval(trickle);
+        const message = err instanceof Error ? err.message : "Unknown error";
+        setErrorMsg(`Story ${story.index}: ${message}`);
+        setExporting(false);
+        setStatusMsg("");
+        return;
+      }
+    }
+
+    setExporting(false);
+    setStatusMsg("");
+    onSuccess?.(`Posted ${toPost.length} ${toPost.length === 1 ? "story" : "stories"} to Instagram.`);
+    onClose();
+  }
+
+  function handleAction() {
+    if (destination === "download") return handleDownload();
+    return handleInstagram();
+  }
+
   const tabBtn = (active: boolean) =>
     `flex-1 py-1.5 text-[0.7rem] font-semibold tracking-[0.04em] rounded border cursor-pointer transition-colors duration-150 ${
       active
@@ -56,25 +149,31 @@ export default function ExportDialog({ stories, approvedIndices = [], date, onCl
         : "border-border-mid bg-transparent text-brand-white opacity-40 hover:opacity-70"
     }`;
 
+  const actionLabel =
+    exporting
+      ? destination === "instagram" ? "POSTING..." : "EXPORTING..."
+      : destination === "instagram"
+        ? `POST TO INSTAGRAM (${selected.size})`
+        : `EXPORT (${selected.size})`;
+
   return (
     <div
       className="fixed inset-0 z-[100] bg-black/85 flex items-center justify-center p-6"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => { if (e.target === e.currentTarget && !exporting) onClose(); }}
     >
       <div className="w-full max-w-[480px] bg-surface border border-border-mid rounded-xl overflow-hidden">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <span className="text-xs font-semibold text-brand-white tracking-[0.08em]">EXPORT STORIES</span>
           <button
             onClick={onClose}
-            className="bg-transparent border-none text-brand-white opacity-40 hover:opacity-80 cursor-pointer text-lg leading-none"
+            disabled={exporting}
+            className="bg-transparent border-none text-brand-white opacity-40 hover:opacity-80 cursor-pointer text-lg leading-none disabled:opacity-20 disabled:cursor-not-allowed"
           >
             ✕
           </button>
         </div>
 
-        {/* Story list */}
-        <div className="px-6 pt-4 pb-2 max-h-[50vh] overflow-y-auto">
+        <div className="px-6 pt-4 pb-2 max-h-[40vh] overflow-y-auto">
           {stories.map((story) => (
             <label
               key={story.index}
@@ -103,7 +202,6 @@ export default function ExportDialog({ stories, approvedIndices = [], date, onCl
           ))}
         </div>
 
-        {/* Quick selection */}
         <div className="px-6 pb-3 flex gap-3">
           <button onClick={selectAll} className="bg-transparent border-none text-[0.65rem] text-brand-white opacity-35 hover:opacity-60 cursor-pointer p-0">
             Select all
@@ -121,31 +219,52 @@ export default function ExportDialog({ stories, approvedIndices = [], date, onCl
           )}
         </div>
 
-        {/* Format toggle */}
         <div className="px-6 pb-4">
-          <p className="text-[0.65rem] text-brand-white opacity-35 mb-2 font-semibold tracking-[0.04em]">FORMAT</p>
+          <p className="text-[0.65rem] text-brand-white opacity-35 mb-2 font-semibold tracking-[0.04em]">DESTINATION</p>
           <div className="flex gap-2">
-            <button onClick={() => setFormat("zip")} className={tabBtn(format === "zip")}>ZIP</button>
-            <button onClick={() => setFormat("individual")} className={tabBtn(format === "individual")}>INDIVIDUAL</button>
+            <button onClick={() => setDestination("download")} className={tabBtn(destination === "download")}>DOWNLOAD</button>
+            <button onClick={() => setDestination("instagram")} className={tabBtn(destination === "instagram")}>INSTAGRAM</button>
           </div>
         </div>
 
-        {/* Progress bar */}
-        {exporting && (
+        {destination === "download" && (
           <div className="px-6 pb-4">
-            <div className="h-1 bg-border rounded-full overflow-hidden">
-              <div
-                className="h-full bg-brand-white transition-all duration-300"
-                style={{ width: `${(progress.current / progress.total) * 100}%` }}
-              />
+            <p className="text-[0.65rem] text-brand-white opacity-35 mb-2 font-semibold tracking-[0.04em]">FORMAT</p>
+            <div className="flex gap-2">
+              <button onClick={() => setFormat("zip")} className={tabBtn(format === "zip")}>ZIP</button>
+              <button onClick={() => setFormat("individual")} className={tabBtn(format === "individual")}>INDIVIDUAL</button>
             </div>
-            <p className="text-[0.65rem] text-brand-white opacity-35 mt-1.5">
-              Exporting {progress.current} of {progress.total}...
+          </div>
+        )}
+
+        {destination === "instagram" && (
+          <div className="px-6 pb-4">
+            <p className="text-[0.6rem] text-brand-white opacity-35 leading-snug">
+              Posts as Instagram stories from your linked account. Stories expire in 24h. Posts are sequential — keep this dialog open until done.
             </p>
           </div>
         )}
 
-        {/* Footer */}
+        {exporting && (
+          <div className="px-6 pb-4">
+            <div className="h-1 bg-border rounded-full overflow-hidden">
+              <div
+                className="h-full bg-brand-white transition-all duration-200 ease-out"
+                style={{ width: `${(progress.current / Math.max(1, progress.total)) * 100}%` }}
+              />
+            </div>
+            <p className="text-[0.65rem] text-brand-white opacity-50 mt-1.5">
+              {statusMsg || `Processing ${Math.floor(progress.current)} of ${progress.total}…`}
+            </p>
+          </div>
+        )}
+
+        {errorMsg && (
+          <div className="mx-6 mb-4 p-2.5 rounded border border-danger/40 bg-danger/10">
+            <p className="text-[0.7rem] text-danger leading-snug">{errorMsg}</p>
+          </div>
+        )}
+
         <div className="flex gap-3 px-6 py-4 border-t border-border">
           <button
             onClick={onClose}
@@ -155,11 +274,11 @@ export default function ExportDialog({ stories, approvedIndices = [], date, onCl
             CANCEL
           </button>
           <button
-            onClick={handleExport}
+            onClick={handleAction}
             disabled={exporting || selected.size === 0}
             className="flex-1 py-2.5 rounded-lg bg-brand-white text-brand-black text-xs font-semibold tracking-[0.04em] border-none cursor-pointer hover:opacity-90 transition-opacity disabled:opacity-30"
           >
-            {exporting ? "EXPORTING..." : `EXPORT (${selected.size})`}
+            {actionLabel}
           </button>
         </div>
       </div>

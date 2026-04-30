@@ -11,6 +11,8 @@ function sanitizeTitle(title: string): string {
 async function captureCard(
   story: Story,
   html2canvas: (el: HTMLElement, opts: Record<string, unknown>) => Promise<HTMLCanvasElement>,
+  mimeType: "image/png" | "image/jpeg" = "image/png",
+  scale = 4,
 ): Promise<Blob> {
   const container = document.createElement("div");
   container.style.cssText = "position:fixed;left:-9999px;top:0;width:405px;height:720px;overflow:hidden;";
@@ -26,7 +28,7 @@ async function captureCard(
   const canvas = await html2canvas(container, {
     width: 405,
     height: 720,
-    scale: 4,
+    scale,
     backgroundColor: "#0a0a0a",
     useCORS: true,
     logging: false,
@@ -36,7 +38,11 @@ async function captureCard(
   document.body.removeChild(container);
 
   return new Promise<Blob>((resolve, reject) =>
-    canvas.toBlob((b) => b ? resolve(b) : reject(new Error("toBlob failed")), "image/png")
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("toBlob failed"))),
+      mimeType,
+      mimeType === "image/jpeg" ? 0.95 : undefined,
+    ),
   );
 }
 
@@ -47,6 +53,15 @@ function downloadBlob(blob: Blob, filename: string) {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+export async function captureStoryToBlob(
+  story: Story,
+  mimeType: "image/png" | "image/jpeg" = "image/png",
+  scale = 4,
+): Promise<Blob> {
+  const html2canvas = (await import("html2canvas-pro")).default;
+  return captureCard(story, html2canvas, mimeType, scale);
 }
 
 export async function captureStories(
