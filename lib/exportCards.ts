@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import { createElement } from "react";
 import { Story } from "@/types";
 import StoryContent from "@/components/StoryContent";
+import { preloadTintedAccents } from "@/lib/tintedAccent";
 
 function sanitizeTitle(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
@@ -57,6 +58,9 @@ export async function captureStories(
   const blobs: { blob: Blob; filename: string }[] = [];
 
   const html2canvas = (await import("html2canvas-pro")).default;
+
+  // Pre-tint all accent PNGs so the tinted data URLs are cached before capture.
+  await preloadTintedAccents(stories.map((s) => s.accentColor));
 
   for (let i = 0; i < stories.length; i++) {
     const story = stories[i];

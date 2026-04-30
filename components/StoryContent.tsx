@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Story } from "@/types";
+import { getTintedDataUrlSync, tintedDataUrl } from "@/lib/tintedAccent";
 
 const CORNER_SIZE = { small: 28, medium: 44 } as const;
 
@@ -10,27 +12,29 @@ const HEADLINE_SIZE = {
   compact: "1.5rem",
 } as const;
 
-/** Shared mask styles for rendering a PNG image tinted to a given color */
-function maskStyle(src: string, color: string): React.CSSProperties {
-  return {
-    backgroundColor: color,
-    WebkitMaskImage: `url(${src})`,
-    maskImage: `url(${src})`,
-    WebkitMaskSize: "contain",
-    maskSize: "contain",
-    WebkitMaskRepeat: "no-repeat",
-    maskRepeat: "no-repeat",
-    WebkitMaskPosition: "center",
-    maskPosition: "center",
-  };
-}
-
 function accentSrc(type: ">" | "+"): string {
   return type === "+" ? "/accent-plus-2.png" : "/accent-chevron-2.png";
 }
 
+/**
+ * Render an accent PNG tinted to `color`. Tints offscreen via canvas and
+ * outputs a plain `<img>` — html2canvas-pro can't apply CSS `mask-image`,
+ * which leaves the underlying box solid in the export.
+ */
+function TintedAccent({ src, color, style }: { src: string; color: string; style?: React.CSSProperties }) {
+  const [url, setUrl] = useState<string | undefined>(() => getTintedDataUrlSync(src, color));
+  useEffect(() => {
+    if (url) return;
+    let cancelled = false;
+    tintedDataUrl(src, color).then((u) => { if (!cancelled) setUrl(u); });
+    return () => { cancelled = true; };
+  }, [src, color, url]);
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={url ?? src} alt="" draggable={false} style={{ objectFit: "contain", visibility: url ? "visible" : "hidden", ...style }} />;
+}
+
 function CornerIcon({ type, color, size }: { type: ">" | "+"; color: string; size: number }) {
-  return <div style={{ width: size, height: size, ...maskStyle(accentSrc(type), color) }} />;
+  return <TintedAccent src={accentSrc(type)} color={color} style={{ width: size, height: size }} />;
 }
 
 function GhostAccentElement({ type, color, position }: { type: ">" | "+"; color: string; position: "bottom-right" | "center" | "top-left" }) {
@@ -59,13 +63,14 @@ function GhostAccentElement({ type, color, position }: { type: ">" | "+"; color:
   };
 
   return (
-    <div
+    <TintedAccent
+      src={accentSrc(type)}
+      color={color}
       style={{
         position: "absolute",
         zIndex: 1,
         pointerEvents: "none",
         opacity: position === "center" ? 0.06 : 0.1,
-        ...maskStyle(accentSrc(type), color),
         ...positionStyles[position],
       }}
     />
@@ -74,9 +79,10 @@ function GhostAccentElement({ type, color, position }: { type: ">" | "+"; color:
 
 function SourceIcon({ type, color }: { type: ">" | "+"; color: string }) {
   return (
-    <span
-      className="inline-block align-middle"
-      style={{ width: 10, height: 10, marginRight: 6, ...maskStyle(accentSrc(type), color) }}
+    <TintedAccent
+      src={accentSrc(type)}
+      color={color}
+      style={{ width: 10, height: 10, marginRight: 6, display: "inline-block", verticalAlign: "middle" }}
     />
   );
 }
@@ -92,9 +98,10 @@ function BodyContent({ story }: { story: Story }) {
       <ul className="list-none p-0 mt-4 flex flex-col gap-2.5">
         {lines.map((line, i) => (
           <li key={i} className="flex items-start gap-2.5 text-brand-white opacity-70">
-            <div
-              className="shrink-0"
-              style={{ width: 14, height: 14, marginTop: 4, ...maskStyle("/accent-chevron-2.png", accentColor) }}
+            <TintedAccent
+              src="/accent-chevron-2.png"
+              color={accentColor}
+              style={{ width: 14, height: 14, marginTop: 4, flexShrink: 0 }}
             />
             <span
               className="text-[length:var(--text-body)] leading-[1.55] flex-1"
