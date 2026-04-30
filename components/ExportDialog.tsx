@@ -20,7 +20,7 @@ interface Prefs {
 }
 
 const PREFS_KEY = "bainsa-export-prefs";
-const DEFAULT_PREFS: Prefs = { destination: "download", format: "zip" };
+const DEFAULT_PREFS: Prefs = { destination: "instagram", format: "zip" };
 
 function loadPrefs(): Prefs {
   if (typeof window === "undefined") return DEFAULT_PREFS;
@@ -222,17 +222,35 @@ export default function ExportDialog({ stories, approvedIndices = [], date, onCl
         <div className="px-6 pb-4">
           <p className="text-[0.65rem] text-brand-white opacity-35 mb-2 font-semibold tracking-[0.04em]">DESTINATION</p>
           <div className="flex gap-2">
-            <button onClick={() => setDestination("download")} className={tabBtn(destination === "download")}>DOWNLOAD</button>
             <button onClick={() => setDestination("instagram")} className={tabBtn(destination === "instagram")}>INSTAGRAM</button>
+            <button onClick={() => setDestination("download")} className={tabBtn(destination === "download")}>DOWNLOAD</button>
           </div>
         </div>
 
         {destination === "download" && (
-          <div className="px-6 pb-4">
-            <p className="text-[0.65rem] text-brand-white opacity-35 mb-2 font-semibold tracking-[0.04em]">FORMAT</p>
-            <div className="flex gap-2">
-              <button onClick={() => setFormat("zip")} className={tabBtn(format === "zip")}>ZIP</button>
-              <button onClick={() => setFormat("individual")} className={tabBtn(format === "individual")}>INDIVIDUAL</button>
+          <div className="px-6 pb-4 flex items-center gap-3">
+            <span className="text-[0.65rem] text-brand-white opacity-35 font-semibold tracking-[0.04em]">FORMAT</span>
+            <div className="inline-flex rounded-md border border-border-mid p-0.5">
+              <button
+                onClick={() => setFormat("zip")}
+                className={`px-2.5 py-1 text-[0.65rem] font-semibold tracking-[0.04em] rounded-[4px] cursor-pointer border-none transition-colors ${
+                  format === "zip"
+                    ? "bg-border-mid text-brand-white"
+                    : "bg-transparent text-brand-white opacity-50 hover:opacity-80"
+                }`}
+              >
+                ZIP
+              </button>
+              <button
+                onClick={() => setFormat("individual")}
+                className={`px-2.5 py-1 text-[0.65rem] font-semibold tracking-[0.04em] rounded-[4px] cursor-pointer border-none transition-colors ${
+                  format === "individual"
+                    ? "bg-border-mid text-brand-white"
+                    : "bg-transparent text-brand-white opacity-50 hover:opacity-80"
+                }`}
+              >
+                INDIVIDUAL
+              </button>
             </div>
           </div>
         )}
