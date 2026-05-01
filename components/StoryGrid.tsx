@@ -514,7 +514,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
       )}
 
       {toast && (
-        <div className="toast-in fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] px-4 py-3 rounded-lg border border-success/40 bg-surface-2/95 backdrop-blur shadow-lg flex items-center gap-2">
+        <div className="toast-in fixed bottom-6 inset-x-0 mx-auto w-fit z-[200] px-4 py-3 rounded-lg border border-success/40 bg-surface-2/95 backdrop-blur shadow-lg flex items-center gap-2">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0">
             <path d="M3 7l3 3 5-6" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>

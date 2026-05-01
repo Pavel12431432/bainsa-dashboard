@@ -42,6 +42,7 @@ export default function ExportDialog({ stories, approvedIndices = [], date, onCl
   const [destination, setDestination] = useState<Destination>(() => loadPrefs().destination);
   const [format, setFormat] = useState<"zip" | "individual">(() => loadPrefs().format);
   const [exporting, setExporting] = useState(false);
+  const [confirmingIg, setConfirmingIg] = useState(false);
   // progress.current is fractional (e.g. 1.4 = 1 done + 40% through 2nd)
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [statusMsg, setStatusMsg] = useState<string>("");
@@ -51,6 +52,7 @@ export default function ExportDialog({ stories, approvedIndices = [], date, onCl
     try {
       localStorage.setItem(PREFS_KEY, JSON.stringify({ destination, format }));
     } catch {}
+    setConfirmingIg(false);
   }, [destination, format]);
 
   function toggle(index: number) {
@@ -85,6 +87,7 @@ export default function ExportDialog({ stories, approvedIndices = [], date, onCl
     const toPost = stories.filter((s) => selected.has(s.index));
     if (toPost.length === 0) return;
 
+    setConfirmingIg(false);
     setExporting(true);
     setErrorMsg("");
     setStatusMsg("");
@@ -139,7 +142,7 @@ export default function ExportDialog({ stories, approvedIndices = [], date, onCl
 
   function handleAction() {
     if (destination === "download") return handleDownload();
-    return handleInstagram();
+    setConfirmingIg(true);
   }
 
   const tabBtn = (active: boolean) =>
@@ -300,6 +303,39 @@ export default function ExportDialog({ stories, approvedIndices = [], date, onCl
           </button>
         </div>
       </div>
+
+      {confirmingIg && !exporting && (
+        <div
+          className="fixed inset-0 z-[110] bg-black/70 flex items-center justify-center p-6"
+          onClick={(e) => { if (e.target === e.currentTarget) setConfirmingIg(false); }}
+        >
+          <div className="w-full max-w-[380px] bg-surface-2 border border-border-mid rounded-xl overflow-hidden shadow-2xl">
+            <div className="px-6 pt-6 pb-5">
+              <h3 className="text-sm font-semibold text-brand-white m-0 mb-2 tracking-[0.02em]">Post to Instagram?</h3>
+              <p className="text-[0.8rem] text-brand-white opacity-60 leading-relaxed m-0">
+                {selected.size === 1
+                  ? "1 story will be published as an Instagram story from your linked account."
+                  : `${selected.size} stories will be published as Instagram stories from your linked account.`}
+              </p>
+            </div>
+            <div className="flex gap-2 px-6 pb-5">
+              <button
+                onClick={() => setConfirmingIg(false)}
+                className="flex-1 py-2.5 rounded-lg border border-border-mid bg-transparent text-brand-white text-xs font-semibold tracking-[0.04em] cursor-pointer opacity-60 hover:opacity-90 transition-opacity"
+              >
+                CANCEL
+              </button>
+              <button
+                onClick={handleInstagram}
+                autoFocus
+                className="flex-1 py-2.5 rounded-lg bg-brand-white text-brand-black text-xs font-semibold tracking-[0.04em] border-none cursor-pointer hover:opacity-90 transition-opacity"
+              >
+                POST
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
