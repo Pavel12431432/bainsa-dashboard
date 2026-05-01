@@ -181,7 +181,7 @@ Lorenzo is invoked on-demand from the Teach Sofia page ("PROPOSE UPDATES" button
 
 ## Instagram direct publishing
 
-ExportDialog has a **DESTINATION** toggle: DOWNLOAD (existing PNG/ZIP flow) or INSTAGRAM (posts as Stories via Graph API). Posts run sequentially with no delay — the dialog must stay open until done. A background queue with delay/scheduling is a future feature.
+ExportDialog has a **DESTINATION** toggle: DOWNLOAD (existing PNG/ZIP flow) or INSTAGRAM (posts as Stories via Graph API). Clicking POST TO INSTAGRAM opens a centered confirm overlay (modal-on-modal) before any request fires — posting is irreversible from this UI. Posts run sequentially with no delay — the dialog must stay open until done. A background queue with delay/scheduling is a future feature.
 
 Flow per story:
 1. Client renders the card via `captureStoryToBlob(story, "image/jpeg", 8/3)` — JPEG at 1080×1920 (Meta's Stories max; render at higher resolution gets rejected with the cryptic `code=1` "unknown error").
