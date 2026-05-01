@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFile } from "fs/promises";
 import { parseStories } from "@/lib/parseStories";
 import { readApprovals } from "@/lib/approvals";
+import { readPosted } from "@/lib/posted";
 import { fileExists } from "@/lib/fs";
 import { isValidDate } from "@/lib/date";
 import { requireEnv } from "@/lib/env";
@@ -17,13 +18,14 @@ export async function GET(
   const filePath = `${requireEnv("STORIES_PATH")}/${date}.md`;
 
   if (!(await fileExists(filePath))) {
-    return NextResponse.json({ stories: [], approvals: { approved: [], rejected: [] } });
+    return NextResponse.json({ stories: [], approvals: { approved: [], rejected: [] }, posted: {} });
   }
 
-  const [markdown, approvals] = await Promise.all([
+  const [markdown, approvals, posted] = await Promise.all([
     readFile(filePath, "utf-8"),
     readApprovals(date),
+    readPosted(date),
   ]);
 
-  return NextResponse.json({ stories: parseStories(markdown), approvals });
+  return NextResponse.json({ stories: parseStories(markdown), approvals, posted });
 }

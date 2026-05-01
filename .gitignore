@@ -40,6 +40,7 @@ yarn-error.log*
 # sample data runtime mutations (teammates running locally)
 /samples/stories/*.approved.json
 /samples/stories/*.history.json
+/samples/stories/*.posted.json
 /samples/instructions/ADAPTIVE.history.json
 
 # vercel

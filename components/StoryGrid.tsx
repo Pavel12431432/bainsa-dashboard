@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from "react";
-import { Story, ApprovalState } from "@/types";
+import { Story, ApprovalState, PostedMap } from "@/types";
 import { apiFetch } from "@/lib/fetch";
 import { checkCompliance } from "@/lib/compliance";
 import { diffFields } from "@/lib/storyUtils";
@@ -17,6 +17,7 @@ interface Props {
   date: string;
   initialStories: Story[];
   initialApprovals: ApprovalState;
+  initialPosted?: PostedMap;
   highlightIndex?: number;
 }
 
@@ -39,7 +40,7 @@ const DIVISION_COLORS: Record<Division, string> = {
   Analysis: "#fe6203",
 };
 
-export default function StoryGrid({ date, initialStories, initialApprovals, highlightIndex }: Props) {
+export default function StoryGrid({ date, initialStories, initialApprovals, initialPosted = {}, highlightIndex }: Props) {
   const [stories, setStories] = useState<Story[]>(initialStories);
   const storiesRef = useRef(stories);
   storiesRef.current = stories;
@@ -59,6 +60,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
     }, 300);
   }, [highlightIndex]);
   const [approvals, setApprovals] = useState<ApprovalState>(initialApprovals);
+  const [posted, setPosted] = useState<PostedMap>(initialPosted);
   const [editing, setEditing] = useState<Story | null>(null);
   const [showExport, setShowExport] = useState(false);
   const [toast, setToast] = useState<string>("");
@@ -158,6 +160,16 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
         return fresh.find((s) => s.index === prev.index) ?? prev;
       });
       if (data.approvals) setApprovals(data.approvals);
+      if (data.posted) setPosted(data.posted);
+    } catch {}
+  }, [date]);
+
+  const refreshPosted = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/stories/${date}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.posted) setPosted(data.posted);
     } catch {}
   }, [date]);
 
@@ -507,9 +519,11 @@ export default function StoryGrid({ date, initialStories, initialApprovals, high
         <ExportDialog
           stories={stories}
           approvedIndices={approvals.approved}
+          posted={posted}
           date={date}
           onClose={() => setShowExport(false)}
-          onSuccess={setToast}
+          onSuccess={(message) => { setToast(message); refreshPosted(); }}
+          onPosted={(index, record) => setPosted((prev) => ({ ...prev, [index]: [...(prev[index] ?? []), record] }))}
         />
       )}
 

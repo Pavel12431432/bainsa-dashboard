@@ -1,6 +1,6 @@
 # BAINSA Dashboard — Codebase Reference
 
-Read this file instead of exploring the codebase. It is complete and up-to-date as of 2026-04-23.
+Read this file instead of exploring the codebase. It is complete and up-to-date as of 2026-05-01.
 
 ## Demo mode (for teammates / local dev)
 
@@ -183,9 +183,11 @@ Lorenzo is invoked on-demand from the Teach Sofia page ("PROPOSE UPDATES" button
 
 ExportDialog has a **DESTINATION** toggle: DOWNLOAD (existing PNG/ZIP flow) or INSTAGRAM (posts as Stories via Graph API). Clicking POST TO INSTAGRAM opens a centered confirm overlay (modal-on-modal) before any request fires — posting is irreversible from this UI. Posts run sequentially with no delay — the dialog must stay open until done. A background queue with delay/scheduling is a future feature.
 
+**Posted tracking**: each successful post appends a record to `{STORIES_PATH}/{date}.posted.json` keyed by story index (history-shaped, so reposts accumulate as additional entries). The client passes `?date=&index=` on the publish request so the route can write the sidecar; if either is missing/invalid the post still succeeds but isn't tracked. The dialog shows a `POSTED` (or `POSTED ×N`) pill on rows that have already been posted, and the confirm overlay surfaces an amber **ALREADY POSTED** callout listing affected stories — non-blocking, just a warning since reposts are sometimes intentional. There is deliberately no UI to clear posted state (it's a fact, not a preference); edit the sidecar by hand for the rare mis-track case.
+
 Flow per story:
 1. Client renders the card via `captureStoryToBlob(story, "image/jpeg", 8/3)` — JPEG at 1080×1920 (Meta's Stories max; render at higher resolution gets rejected with the cryptic `code=1` "unknown error").
-2. Client POSTs the JPEG bytes to `/api/instagram/publish` (Content-Type: image/jpeg, X-Requested-With: fetch).
+2. Client POSTs the JPEG bytes to `/api/instagram/publish?date=YYYY-MM-DD&index=N` (Content-Type: image/jpeg, X-Requested-With: fetch). The query params are best-effort tracking metadata — missing/invalid values just skip sidecar writes, the post still proceeds.
 3. Server saves bytes to `$TMPDIR/bainsa-ig-temp/<32hex>.jpg` via `lib/igTempStore.ts` and computes the public URL `${IG_PUBLIC_BASE}/ig-temp/<key>`. The `app/ig-temp/[key]/route.ts` handler serves GET/HEAD with `Content-Length` + `Cache-Control: public, max-age=600`. Path is whitelisted in `proxy.ts` so it bypasses auth.
 4. Server calls Meta: `POST /{IG_USER_ID}/media?media_type=STORIES&image_url=<public-url>` → polls container `status_code` until FINISHED → `POST /{IG_USER_ID}/media_publish?creation_id=…`.
 5. On success, schedules `deleteImage(key)` after 10 minutes (Meta has fetched it by then). On error, returns 502 with the Meta message (`metaCall` logs the full Meta error JSON to stdout for debugging — `error_user_msg` is often hidden inside the wrapper `message`) and the temp file is deleted immediately.
@@ -204,7 +206,8 @@ On success, ExportDialog calls `onSuccess(message)` on the parent (StoryGrid) wh
 4. Edits write back to the same `.md` file via `replaceStory()` in `serializeStories.ts`
 5. Approvals stored in `YYYY-MM-DD.approved.json` sidecar next to stories (includes optional `feedback` map: story index -> rejection reason)
 6. Version history stored in `YYYY-MM-DD.history.json` sidecar next to stories
-7. Human triggers Lorenzo from Teach page -> pending proposal stored in `ADAPTIVE.proposal.json` in `SOFIA_INSTRUCTIONS_PATH` -> on accept, proposal content replaces ADAPTIVE.md and previous version goes to `ADAPTIVE.history.json` tagged `source: "editor-agent"`
+7. Successful Instagram posts append to `YYYY-MM-DD.posted.json` sidecar (per-index history of `{ postedAt, mediaId, containerId? }`)
+8. Human triggers Lorenzo from Teach page -> pending proposal stored in `ADAPTIVE.proposal.json` in `SOFIA_INSTRUCTIONS_PATH` -> on accept, proposal content replaces ADAPTIVE.md and previous version goes to `ADAPTIVE.history.json` tagged `source: "editor-agent"`
 
 ## Story markdown format (current Sofia output)
 
@@ -279,6 +282,14 @@ interface ComplianceResult {
 
 const ACCENT_COLORS = { Analysis: "#fe6203", Projects: "#2c40e8", Culture: "#fe43a7" };
 
+interface PostRecord {
+  postedAt: string;        // ISO timestamp
+  mediaId: string;         // IG media id from /media_publish
+  containerId?: string;    // IG container id from /media (pre-publish)
+}
+
+type PostedMap = Record<number, PostRecord[]>;  // story index -> post history
+
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
@@ -303,7 +314,7 @@ interface ChatMessage {
 
 | File | Purpose |
 |---|---|
-| `api/stories/[date]/route.ts` | `GET` — returns `{ stories, approvals }` JSON |
+| `api/stories/[date]/route.ts` | `GET` — returns `{ stories, approvals, posted }` JSON |
 | `api/stories/[date]/[index]/update/route.ts` | `POST` — updates story in markdown file via `replaceStory()` |
 | `api/stories/[date]/[index]/approve/route.ts` | `POST` — sets approval state |
 | `api/stories/[date]/[index]/chat/route.ts` | `POST` — proxies chat to Sofia via `chatWithAgent("sofia", ...)` |
@@ -349,7 +360,7 @@ interface ChatMessage {
 | `FeedbackInspector.tsx` | Modal opened from TeachEditor. Shows 7/14/30/None window selector (None = days:0, skip feedback entirely), summary pills (approvals/rejections/edits/variants), tabbed signal list (rejections/edits/variants/approvals) with expandable rows showing full detail (rejection reason, before/after diffs for edits, etc.). Before generation: optional 500-char `Focus` textarea (Cmd/Ctrl+Enter submits) above the CANCEL / GENERATE PROPOSAL row; focus is one-shot, reset whenever the modal closes. With None selected, focus becomes required and GENERATE stays disabled until it has content; the subtitle/placeholder/footer copy adjust to make this explicit. `onGenerate(days, focus?)` threads it to the API. After generation (review-only mode): accepts `highlightRefs` from ProposalView rationale/conflict clicks to pre-expand and visually highlight matching rows. |
 | `ProposalView.tsx` | Renders a pending Lorenzo proposal: header with time-ago + window + signal counts, optional focus breadcrumb (`FOCUS · "..."`) when `operatorFocus` is set on the proposal — survives refines, refine breadcrumb (`REFINED N×  "nudge1" → "nudge2"` with UNDO button when `previousProposal` is present), amber warnings pills (shrinkage / unchanged-from-previous), amber conflict callout (if any), summary, bulleted rationale with clickable `[rejection-0, edit-2]` citation links (call `onInspect(refs)`) — purely focus-driven bullets carry empty `signalRefs` and render no chip, inline diff vs current ADAPTIVE.md via `<DiffBlock>`, sticky footer with REJECT / REFINE / EDIT FIRST / ACCEPT. REFINE opens an inline textarea (autoscrolled into view, focus restored); submitting calls `onRefine(nudge)`. On any proposal change (generatedAt), the panel auto-scrolls to top so the updated summary is the first thing visible — critical when refine returns near-identical content. Stale amber banner when `basedOnAdaptive !== currentAdaptive`. For `status: "no-changes"`, renders a centered "Lorenzo is leaving things alone" message with only a DISMISS button. |
 | `DiffBlock.tsx` | Shared LCS-diff renderer used by TeachEditor (history diff) and ProposalView (proposal diff). Props: `lines: DiffLine[]`, `inset: "x-3" \| "x-4"` for the pull-out padding, optional `className`. Uses NBSP for empty lines. |
-| `ExportDialog.tsx` | Modal for selecting stories to export as PNG (ZIP or individual). Custom dark checkboxes. Smart pre-selection: approved stories if any, otherwise all. "Approved only" quick filter. Uses html2canvas-pro for rendering + JSZip for bundling. |
+| `ExportDialog.tsx` | Modal for selecting stories to export as PNG (ZIP or individual) or post directly to Instagram. Custom dark checkboxes. Smart pre-selection: approved stories if any, otherwise all. "Approved only" quick filter. Accepts `posted: PostedMap` and renders a `POSTED` (or `POSTED ×N`) pill on each posted row; the IG confirm overlay shows an amber **ALREADY POSTED** callout listing affected stories (warning only, doesn't block). After each successful post calls `onPosted(index, record)` so the parent grid updates optimistically without re-fetching. Uses html2canvas-pro for rendering + JSZip for bundling. |
 
 ### Lib (`lib/`)
 
@@ -361,6 +372,7 @@ interface ChatMessage {
 | `exportCards.ts` | PNG export: renders `StoryContent` offscreen via `createRoot`, captures with html2canvas-pro at 4x scale, downloads individually or as ZIP. Calls `preloadTintedAccents()` before the capture loop. |
 | `tintedAccent.ts` | Tints accent PNGs by recoloring opaque pixels through an offscreen canvas (`source-in` composite), caches data URLs by `src\|color`. Workaround for html2canvas-pro's lack of mask/filter support. Exports `tintedDataUrl`, `getTintedDataUrlSync`, `preloadTintedAccents`. |
 | `approvals.ts` | Read/write approval JSON sidecars. |
+| `posted.ts` | Read/append `{date}.posted.json` sidecar. `readPosted(date) -> PostedMap`, `addPostRecord(date, index, record)` appends to per-index history (does not deduplicate — reposts intentionally accumulate). |
 | `auth.ts` | Cookie name, token creation/verification (constant-time compare). |
 | `rateLimit.ts` | In-memory IP rate limiter: 5 attempts, 15min lockout. Count resets after lockout expires. Used by login Server Action. |
 | `openclaw.ts` | OpenClaw client via Docker CLI (`docker exec openclaw openclaw agent`). `chatWithAgent(agent, sessionId, message)` supports `marco` / `sofia` / `lorenzo` (→ `news-researcher` / `story-generator` / `story-editor`). Also `buildUserMessage()` (story editing system prompt with date-aware body limits and bullet rules), `parseResponse()` (extracts JSON field updates from Sofia markdown), `buildVariantsMessage()` + `parseVariantsResponse()` (variants generation — returns typed `NewVariant[]`, validates all 11 fields). Demo-mode stubs cover all three agents. |

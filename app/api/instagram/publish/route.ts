@@ -3,6 +3,8 @@ import { requireFetch } from "@/lib/apiGuard";
 import { requireEnv } from "@/lib/env";
 import { saveImage, scheduleDelete, deleteImage } from "@/lib/igTempStore";
 import { publishStory } from "@/lib/instagram";
+import { addPostRecord } from "@/lib/posted";
+import { isValidDate } from "@/lib/date";
 
 export async function POST(req: NextRequest) {
   const guard = requireFetch(req);
@@ -19,6 +21,12 @@ export async function POST(req: NextRequest) {
       { status: 503 },
     );
   }
+
+  const url = new URL(req.url);
+  const date = url.searchParams.get("date");
+  const indexRaw = url.searchParams.get("index");
+  const storyIndex = indexRaw ? Number(indexRaw) : NaN;
+  const trackPost = !!(date && isValidDate(date) && Number.isInteger(storyIndex) && storyIndex > 0);
 
   const arrayBuf = await req.arrayBuffer();
   if (!arrayBuf.byteLength) {
@@ -43,6 +51,17 @@ export async function POST(req: NextRequest) {
     const result = await publishStory(imageUrl);
     console.log(`[ig-publish] success, mediaId=${result.mediaId}`);
     scheduleDelete(storedKey);
+    if (trackPost) {
+      try {
+        await addPostRecord(date!, storyIndex, {
+          postedAt: new Date().toISOString(),
+          mediaId: result.mediaId,
+          containerId: result.containerId,
+        });
+      } catch (err) {
+        console.error(`[ig-publish] failed to record post: ${err instanceof Error ? err.message : err}`);
+      }
+    }
     return NextResponse.json({ mediaId: result.mediaId, containerId: result.containerId });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

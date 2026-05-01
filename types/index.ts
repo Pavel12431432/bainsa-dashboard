@@ -57,6 +57,14 @@ export interface HistoryEntry {
   timestamp: string;
 }
 
+export interface PostRecord {
+  postedAt: string;       // ISO timestamp
+  mediaId: string;        // IG media id from /media_publish
+  containerId?: string;   // IG container id from /media (pre-publish)
+}
+
+export type PostedMap = Record<number, PostRecord[]>;
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;

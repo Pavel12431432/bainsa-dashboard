@@ -2,6 +2,7 @@ import { readFile } from "fs/promises";
 import { notFound } from "next/navigation";
 import { parseStories } from "@/lib/parseStories";
 import { readApprovals } from "@/lib/approvals";
+import { readPosted } from "@/lib/posted";
 import { fileExists } from "@/lib/fs";
 import { isValidDate } from "@/lib/date";
 import { requireEnv } from "@/lib/env";
@@ -22,9 +23,10 @@ export default async function StoriesPage({ params, searchParams }: Props) {
   const filePath = `${requireEnv("STORIES_PATH")}/${date}.md`;
 
   const exists = await fileExists(filePath);
-  const [stories, approvals] = await Promise.all([
+  const [stories, approvals, posted] = await Promise.all([
     exists ? readFile(filePath, "utf-8").then(parseStories) : Promise.resolve([]),
     readApprovals(date),
+    readPosted(date),
   ]);
 
   return (
@@ -33,7 +35,7 @@ export default async function StoriesPage({ params, searchParams }: Props) {
 
       {/* Content */}
       <main className="p-5">
-        <StoryGrid date={date} initialStories={stories} initialApprovals={approvals} highlightIndex={highlight ? Number(highlight) : undefined} />
+        <StoryGrid date={date} initialStories={stories} initialApprovals={approvals} initialPosted={posted} highlightIndex={highlight ? Number(highlight) : undefined} />
       </main>
     </div>
   );
