@@ -194,6 +194,8 @@ Flow per story:
 
 On success, ExportDialog calls `onSuccess(message)` on the parent (StoryGrid) which shows a bottom-center toast that auto-dismisses after 4s. Progress bar trickles smoothly during each request (NProgress-style — caps at 90% until the request actually returns).
 
+`/api/instagram/account` is a GET endpoint that returns `{ username }` for the account behind the current `IG_ACCESS_TOKEN` (cached server-side per token, so swapping the token invalidates without restart). ExportDialog calls it on first switch to the INSTAGRAM destination and renders `Posting as @username` in both the dialog body and the confirm overlay so you can't accidentally post to the wrong account after a token swap.
+
 `/api/instagram/check` is a diagnostic GET endpoint that validates env vars, token, IG user lookup, Page→IG link, and granted permissions. Hit it in a browser when posting breaks.
 
 **Why self-host through the tunnel?** We tried several intermediaries before this. ImgBB returns 403 to Meta's crawler IPs. Catbox went down with "uploads paused". Cloudflare R2's S3 endpoint refused TLS handshakes from this network. Cloudflare Workers on `*.workers.dev` and R2 buckets on `*.r2.dev` are blocked for Meta scrapers at the platform level (and adding a custom domain on a Worker still got 9004 from `/media` even when the FB debugger scraped fine — IG's fetcher seems pickier than the debugger). Self-hosting via the existing Cloudflare tunnel at `dashboard.pavelj.com` works because it's a normal origin and Meta is allowlisted as a verified bot there.

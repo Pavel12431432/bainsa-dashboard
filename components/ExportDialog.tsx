@@ -44,6 +44,8 @@ export default function ExportDialog({ stories, approvedIndices = [], posted = {
   });
   const [destination, setDestination] = useState<Destination>(() => loadPrefs().destination);
   const [format, setFormat] = useState<"zip" | "individual">(() => loadPrefs().format);
+  const [igUsername, setIgUsername] = useState<string | null>(null);
+  const [igUsernameError, setIgUsernameError] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [confirmingIg, setConfirmingIg] = useState(false);
   // progress.current is fractional (e.g. 1.4 = 1 done + 40% through 2nd)
@@ -57,6 +59,16 @@ export default function ExportDialog({ stories, approvedIndices = [], posted = {
     } catch {}
     setConfirmingIg(false);
   }, [destination, format]);
+
+  useEffect(() => {
+    if (destination !== "instagram" || igUsername || igUsernameError) return;
+    let cancelled = false;
+    fetch("/api/instagram/account")
+      .then((r) => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
+      .then((data) => { if (!cancelled && data.username) setIgUsername(data.username); })
+      .catch(() => { if (!cancelled) setIgUsernameError(true); });
+    return () => { cancelled = true; };
+  }, [destination, igUsername, igUsernameError]);
 
   function toggle(index: number) {
     setSelected((prev) => {
@@ -281,8 +293,18 @@ export default function ExportDialog({ stories, approvedIndices = [], posted = {
 
         {destination === "instagram" && (
           <div className="px-6 pb-4">
+            <p className="text-[0.65rem] text-brand-white opacity-50 leading-snug mb-1">
+              Posting as{" "}
+              {igUsername ? (
+                <span className="font-semibold text-brand-white opacity-100">@{igUsername}</span>
+              ) : igUsernameError ? (
+                <span className="text-amber-400">unknown (check IG_ACCESS_TOKEN)</span>
+              ) : (
+                <span className="opacity-60">…</span>
+              )}
+            </p>
             <p className="text-[0.6rem] text-brand-white opacity-35 leading-snug">
-              Posts as Instagram stories from your linked account. Stories expire in 24h. Posts are sequential — keep this dialog open until done.
+              Stories expire in 24h. Posts are sequential — keep this dialog open until done.
             </p>
           </div>
         )}
@@ -334,9 +356,12 @@ export default function ExportDialog({ stories, approvedIndices = [], posted = {
             <div className="px-6 pt-6 pb-5">
               <h3 className="text-sm font-semibold text-brand-white m-0 mb-2 tracking-[0.02em]">Post to Instagram?</h3>
               <p className="text-[0.8rem] text-brand-white opacity-60 leading-relaxed m-0">
-                {selected.size === 1
-                  ? "1 story will be published as an Instagram story from your linked account."
-                  : `${selected.size} stories will be published as Instagram stories from your linked account.`}
+                {selected.size === 1 ? "1 story will be published" : `${selected.size} stories will be published`} as Instagram stories to{" "}
+                {igUsername ? (
+                  <span className="font-semibold text-brand-white opacity-100">@{igUsername}</span>
+                ) : (
+                  <span className="opacity-80">your linked account</span>
+                )}.
               </p>
               {(() => {
                 const dupes = stories.filter((s) => selected.has(s.index) && hasPosted(s.index));

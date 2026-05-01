@@ -78,6 +78,20 @@ async function publishContainer({ igUserId, token }: IgCreds, containerId: strin
   return data.id;
 }
 
+let cachedUsername: { token: string; username: string } | null = null;
+
+export async function getAccountUsername(): Promise<string> {
+  const igUserId = requireEnv("IG_USER_ID");
+  const token = requireEnv("IG_ACCESS_TOKEN");
+  if (cachedUsername && cachedUsername.token === token) return cachedUsername.username;
+  const data = await metaCall<{ username: string }>(
+    `${GRAPH}/${igUserId}?fields=username&access_token=${encodeURIComponent(token)}`,
+    { method: "GET" },
+  );
+  cachedUsername = { token, username: data.username };
+  return data.username;
+}
+
 export async function publishStory(imageUrl: string): Promise<PublishResult> {
   const creds: IgCreds = { igUserId: requireEnv("IG_USER_ID"), token: requireEnv("IG_ACCESS_TOKEN") };
   const containerId = await createContainer(creds, imageUrl);
