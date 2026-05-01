@@ -21,7 +21,7 @@ async function metaGet(path: string, token: string): Promise<{ ok: boolean; stat
 export async function GET() {
   const token = process.env.IG_ACCESS_TOKEN;
   const igUserId = process.env.IG_USER_ID;
-  const imgbbKey = process.env.IMGBB_API_KEY;
+  const publicBase = process.env.IG_PUBLIC_BASE;
 
   const checks: CheckResult[] = [];
 
@@ -31,8 +31,8 @@ export async function GET() {
   if (!igUserId) checks.push({ ok: false, step: "IG_USER_ID", detail: "missing" });
   else checks.push({ ok: true, step: "IG_USER_ID", detail: igUserId });
 
-  if (!imgbbKey) checks.push({ ok: false, step: "IMGBB_API_KEY", detail: "missing" });
-  else checks.push({ ok: true, step: "IMGBB_API_KEY", detail: `set (${imgbbKey.length} chars)` });
+  if (!publicBase) checks.push({ ok: false, step: "IG_PUBLIC_BASE", detail: "missing" });
+  else checks.push({ ok: true, step: "IG_PUBLIC_BASE", detail: publicBase });
 
   if (!token || !igUserId) {
     return NextResponse.json({ ok: false, checks });

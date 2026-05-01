@@ -176,7 +176,8 @@ Lorenzo is invoked on-demand from the Teach Sofia page ("PROPOSE UPDATES" button
 | `SOFIA_INSTRUCTIONS_PATH` | Sofia's instruction files dir (`FIXED.md`, `ADAPTIVE.md`) |
 | `IG_ACCESS_TOKEN` | Long-lived Page access token for Instagram Graph API (optional — required for direct posting) |
 | `IG_USER_ID` | IG Business Account ID (optional — required for direct posting) |
-| `IMGBB_API_KEY` | Free ImgBB API key (https://api.imgbb.com/) — required for direct posting; story JPEGs are uploaded there with 1h expiration |
+| `IG_PUBLIC_BASE` | Public origin where Meta can fetch story JPEGs (e.g. `https://dashboard.pavelj.com`) — required for direct posting |
+| `IG_TEMP_PATH` | Optional override for the temp JPEG dir (defaults to `$TMPDIR/bainsa-ig-temp`) |
 
 ## Instagram direct publishing
 
@@ -185,15 +186,15 @@ ExportDialog has a **DESTINATION** toggle: DOWNLOAD (existing PNG/ZIP flow) or I
 Flow per story:
 1. Client renders the card via `captureStoryToBlob(story, "image/jpeg", 8/3)` — JPEG at 1080×1920 (Meta's Stories max; render at higher resolution gets rejected with the cryptic `code=1` "unknown error").
 2. Client POSTs the JPEG bytes to `/api/instagram/publish` (Content-Type: image/jpeg, X-Requested-With: fetch).
-3. Server uploads bytes to ImgBB via `lib/imgbbUpload.ts` (requires `IMGBB_API_KEY`, base64 POST, 1h auto-expiration, 3 retries) — returns a public `https://i.ibb.co/...` URL.
-4. Server calls Meta: `POST /{IG_USER_ID}/media?media_type=STORIES&image_url=<imgbb-url>` → polls container `status_code` until FINISHED → `POST /{IG_USER_ID}/media_publish?creation_id=…`.
-5. On error, returns 502 with the Meta message (`metaCall` logs the full Meta error JSON to stdout for debugging — `error_user_msg` is often hidden inside the wrapper `message`).
+3. Server saves bytes to `$TMPDIR/bainsa-ig-temp/<32hex>.jpg` via `lib/igTempStore.ts` and computes the public URL `${IG_PUBLIC_BASE}/ig-temp/<key>`. The `app/ig-temp/[key]/route.ts` handler serves GET/HEAD with `Content-Length` + `Cache-Control: public, max-age=600`. Path is whitelisted in `proxy.ts` so it bypasses auth.
+4. Server calls Meta: `POST /{IG_USER_ID}/media?media_type=STORIES&image_url=<public-url>` → polls container `status_code` until FINISHED → `POST /{IG_USER_ID}/media_publish?creation_id=…`.
+5. On success, schedules `deleteImage(key)` after 10 minutes (Meta has fetched it by then). On error, returns 502 with the Meta message (`metaCall` logs the full Meta error JSON to stdout for debugging — `error_user_msg` is often hidden inside the wrapper `message`) and the temp file is deleted immediately.
 
 On success, ExportDialog calls `onSuccess(message)` on the parent (StoryGrid) which shows a bottom-center toast that auto-dismisses after 4s. Progress bar trickles smoothly during each request (NProgress-style — caps at 90% until the request actually returns).
 
 `/api/instagram/check` is a diagnostic GET endpoint that validates env vars, token, IG user lookup, Page→IG link, and granted permissions. Hit it in a browser when posting breaks.
 
-**Why ImgBB?** Earlier we hosted the JPEG ourselves at `/api/instagram/temp/{token}` behind `dashboard.pavelj.com`, but Cloudflare blocks Meta's datacenter IPs at the edge (FB URL Debugger returned 403). Tried catbox.moe (worked but went down with "uploads paused"). ImgBB is the maintained, well-funded alternative: free API key, base64 POST, optional auto-expiration. Files auto-delete after 1h.
+**Why self-host through the tunnel?** We tried several intermediaries before this. ImgBB returns 403 to Meta's crawler IPs. Catbox went down with "uploads paused". Cloudflare R2's S3 endpoint refused TLS handshakes from this network. Cloudflare Workers on `*.workers.dev` and R2 buckets on `*.r2.dev` are blocked for Meta scrapers at the platform level (and adding a custom domain on a Worker still got 9004 from `/media` even when the FB debugger scraped fine — IG's fetcher seems pickier than the debugger). Self-hosting via the existing Cloudflare tunnel at `dashboard.pavelj.com` works because it's a normal origin and Meta is allowlisted as a verified bot there.
 
 ## Data flow
 
