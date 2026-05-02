@@ -92,7 +92,7 @@ export default function StoryChat({ story, date, sessionId, onUpdate, onReset, d
         } else {
           // Editor was closed — auto-save the updates directly
           const updated = applyUpdates(currentStory, data.updates);
-          await apiFetch(`/api/stories/${currentDate}/${currentIndex}/update`, updated);
+          await apiFetch(`/api/stories/${currentDate}/${currentIndex}/update?source=sofia`, updated);
           markUpdated(currentDate, currentIndex);
           document.dispatchEvent(new CustomEvent("stories-changed"));
         }

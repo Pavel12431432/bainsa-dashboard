@@ -1,6 +1,6 @@
 # BAINSA Dashboard — Codebase Reference
 
-Read this file instead of exploring the codebase. It is complete and up-to-date as of 2026-05-01.
+Read this file instead of exploring the codebase. It is complete and up-to-date as of 2026-05-02.
 
 ## Demo mode (for teammates / local dev)
 
@@ -178,6 +178,7 @@ Lorenzo is invoked on-demand from the Teach Sofia page ("PROPOSE UPDATES" button
 | `IG_USER_ID` | IG Business Account ID (optional — required for direct posting) |
 | `IG_PUBLIC_BASE` | Public origin where Meta can fetch story JPEGs (e.g. `https://dashboard.pavelj.com`) — required for direct posting |
 | `IG_TEMP_PATH` | Optional override for the temp JPEG dir (defaults to `$TMPDIR/bainsa-ig-temp`) |
+| `LOGS_PATH` | Audit log JSONL files (one per day). Defaults to `./logs` |
 
 ## Instagram direct publishing
 
@@ -199,6 +200,22 @@ On success, ExportDialog calls `onSuccess(message)` on the parent (StoryGrid) wh
 `/api/instagram/check` is a diagnostic GET endpoint that validates env vars, token, IG user lookup, Page→IG link, and granted permissions. Hit it in a browser when posting breaks.
 
 **Why self-host through the tunnel?** We tried several intermediaries before this. ImgBB returns 403 to Meta's crawler IPs. Catbox went down with "uploads paused". Cloudflare R2's S3 endpoint refused TLS handshakes from this network. Cloudflare Workers on `*.workers.dev` and R2 buckets on `*.r2.dev` are blocked for Meta scrapers at the platform level (and adding a custom domain on a Worker still got 9004 from `/media` even when the FB debugger scraped fine — IG's fetcher seems pickier than the debugger). Self-hosting via the existing Cloudflare tunnel at `dashboard.pavelj.com` works because it's a normal origin and Meta is allowlisted as a verified bot there.
+
+## Audit logging
+
+Append-only JSONL files at `${LOGS_PATH}/YYYY-MM-DD.jsonl` (one file per day, defaults to `./logs`, gitignored). Surfaced read-only at `/logs` (linked from the hamburger menu) with kind/actor/status/text-search filters and a load-more cursor.
+
+Designed as an audit firehose, **not** domain state — story approvals, posted records, ADAPTIVE history, etc. continue to live in their existing sidecars (those are sources of truth; logs are observability). All reads/writes go through `lib/logs.ts`'s `appendLog` / `queryLogs` so a future DB swap is a one-file change.
+
+Logged kinds: `agent.call` (every Marco/Sofia/Lorenzo call, with duration + prompt length/preview + mode), `ig.post` (success + failure with Meta error message), `proposal.{generate,accept,reject,refine,undo-refine}`, `adaptive.save`, `story.{approve,reject,edit}` (edit carries `source: "manual" | "sofia" | "variant"` — passed via `?source=` query param on `/api/stories/.../update`), `variants.generate`, `export` (download mode only — IG posts already log under `ig.post`), `auth.login.{success,failure}` (failures include IP).
+
+`appendLog` swallows errors (`console.error`s on failure) — logging never breaks user flows. `queryLogs` reads relevant day-files in reverse chronological order, filters in-memory, paginates with a `{date, offset}` cursor. Linear scan, fine for our volume (<200 events/day).
+
+`POST /api/logs` is the client-side log endpoint — only accepts `kind: "export"` (whitelist in the route), called fire-and-forget by `ExportDialog`. All other logging is server-side.
+
+**Retention**: keep forever by default. `npm run logs:prune -- --before YYYY-MM-DD` (`scripts/pruneLogs.ts`) deletes day-files older than the cutoff. At ~300 bytes/event × 200 events/day this is ~22MB/year — pruning is rarely needed.
+
+**Future**: planned migration to a proper DB. Keep all log I/O behind the `lib/logs.ts` interface; no other module should touch the JSONL files directly.
 
 ## Data flow
 
@@ -311,6 +328,7 @@ interface ChatMessage {
 | `app/login/page.tsx` | Login form with Server Action. Sets httpOnly cookie. Rate-limited (5 attempts, 15min lockout via `rateLimit.ts`). Uses BAINSA logo image. |
 | `app/stories/[date]/page.tsx` | Main view: reads stories + approvals, renders `<HeaderShell>` + `<StoryGrid>`. Passes `?highlight` search param to grid. |
 | `app/teach/page.tsx` | Teach Sofia page: reads FIXED.md + ADAPTIVE.md + instruction history, renders `<HeaderShell>` (no date) + `<TeachEditor>`. |
+| `app/logs/page.tsx` | Logs page: server-renders the first page of events via `queryLogs`, hands them to `<LogsView>`. |
 
 ### API routes (`app/api/`)
 
@@ -336,6 +354,7 @@ interface ChatMessage {
 | `api/teach/propose/undo-refine/route.ts` | `POST` — restores `proposal.previousProposal` as the new sidecar state and pops the last `refineHistory` entry. One level only; undoing twice requires regenerating. |
 | `api/teach/propose/accept/route.ts` | `POST` — writes pending proposal's content to ADAPTIVE.md, snapshots previous content to history tagged `source: "editor-agent"`, best-effort deletes sidecar (self-healed by `readProposal` if delete fails). |
 | `api/auth/logout/route.ts` | `GET` — deletes auth cookie, redirects to `/login` |
+| `api/logs/route.ts` | `GET` — paginated log query (filters: `kinds`, `actor`, `ok`, `from`, `to`, `q`, `limit`, `cursorDate`+`cursorOffset`). `POST` — client-side log entry, only `kind: "export"` is whitelisted. |
 
 ### Components (`components/`)
 
@@ -362,7 +381,8 @@ interface ChatMessage {
 | `FeedbackInspector.tsx` | Modal opened from TeachEditor. Shows 7/14/30/None window selector (None = days:0, skip feedback entirely), summary pills (approvals/rejections/edits/variants), tabbed signal list (rejections/edits/variants/approvals) with expandable rows showing full detail (rejection reason, before/after diffs for edits, etc.). Before generation: optional 500-char `Focus` textarea (Cmd/Ctrl+Enter submits) above the CANCEL / GENERATE PROPOSAL row; focus is one-shot, reset whenever the modal closes. With None selected, focus becomes required and GENERATE stays disabled until it has content; the subtitle/placeholder/footer copy adjust to make this explicit. `onGenerate(days, focus?)` threads it to the API. After generation (review-only mode): accepts `highlightRefs` from ProposalView rationale/conflict clicks to pre-expand and visually highlight matching rows. |
 | `ProposalView.tsx` | Renders a pending Lorenzo proposal: header with time-ago + window + signal counts, optional focus breadcrumb (`FOCUS · "..."`) when `operatorFocus` is set on the proposal — survives refines, refine breadcrumb (`REFINED N×  "nudge1" → "nudge2"` with UNDO button when `previousProposal` is present), amber warnings pills (shrinkage / unchanged-from-previous), amber conflict callout (if any), summary, bulleted rationale with clickable `[rejection-0, edit-2]` citation links (call `onInspect(refs)`) — purely focus-driven bullets carry empty `signalRefs` and render no chip, inline diff vs current ADAPTIVE.md via `<DiffBlock>`, sticky footer with REJECT / REFINE / EDIT FIRST / ACCEPT. REFINE opens an inline textarea (autoscrolled into view, focus restored); submitting calls `onRefine(nudge)`. On any proposal change (generatedAt), the panel auto-scrolls to top so the updated summary is the first thing visible — critical when refine returns near-identical content. Stale amber banner when `basedOnAdaptive !== currentAdaptive`. For `status: "no-changes"`, renders a centered "Lorenzo is leaving things alone" message with only a DISMISS button. |
 | `DiffBlock.tsx` | Shared LCS-diff renderer used by TeachEditor (history diff) and ProposalView (proposal diff). Props: `lines: DiffLine[]`, `inset: "x-3" \| "x-4"` for the pull-out padding, optional `className`. Uses NBSP for empty lines. |
-| `ExportDialog.tsx` | Modal for selecting stories to export as PNG (ZIP or individual) or post directly to Instagram. Custom dark checkboxes. Smart pre-selection: approved stories if any, otherwise all. "Approved only" quick filter. Accepts `posted: PostedMap` and renders a `POSTED` (or `POSTED ×N`) pill on each posted row; the IG confirm overlay shows an amber **ALREADY POSTED** callout listing affected stories (warning only, doesn't block). After each successful post calls `onPosted(index, record)` so the parent grid updates optimistically without re-fetching. Uses html2canvas-pro for rendering + JSZip for bundling. |
+| `ExportDialog.tsx` | Modal for selecting stories to export as PNG (ZIP or individual) or post directly to Instagram. Custom dark checkboxes. Smart pre-selection: approved stories if any, otherwise all. "Approved only" quick filter. Accepts `posted: PostedMap` and renders a `POSTED` (or `POSTED ×N`) pill on each posted row; the IG confirm overlay shows an amber **ALREADY POSTED** callout listing affected stories (warning only, doesn't block). After each successful post calls `onPosted(index, record)` so the parent grid updates optimistically without re-fetching. Fire-and-forgets a `POST /api/logs` `kind: "export"` entry on download success (IG posts log server-side). Uses html2canvas-pro for rendering + JSZip for bundling. |
+| `LogsView.tsx` | Client component for the Logs page. Search input + actor / status / kind filter pills, virtualized-light list (slice + LOAD MORE cursor), expand-row to see meta JSON. Re-fetches whenever filters change. Color-coded kind labels via `KIND_COLORS`. |
 
 ### Lib (`lib/`)
 
@@ -404,6 +424,7 @@ interface ChatMessage {
 | `fs.ts` | `fileExists()` utility. |
 | `env.ts` | `requireEnv(name)` — throws if missing. |
 | `date.ts` | `todayRome()`, `isValidDate()`. |
+| `logs.ts` | Audit log JSONL store. `appendLog(event)` writes to `${LOGS_PATH}/YYYY-MM-DD.jsonl` (errors swallowed — never throws upward). `queryLogs(opts)` reads day-files newest-first, filters in-memory, paginates via `{date, offset}` cursor. `LogKind` is the canonical event-name union. |
 
 ## UI architecture
 

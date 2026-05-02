@@ -28,7 +28,11 @@ export async function POST(
   const userMessage = buildUserMessage(story, message);
 
   try {
-    const content = await chatWithAgent("sofia", fullSessionId, userMessage);
+    const content = await chatWithAgent("sofia", fullSessionId, userMessage, {
+      mode: "story-edit",
+      date,
+      storyIndex: parseInt(index, 10),
+    });
     const { message: reply, updates } = parseResponse(content);
     return NextResponse.json({ reply, updates });
   } catch (err) {

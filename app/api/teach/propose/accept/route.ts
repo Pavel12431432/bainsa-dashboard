@@ -4,6 +4,7 @@ import { requireEnv } from "@/lib/env";
 import { requireFetch } from "@/lib/apiGuard";
 import { readProposal, deleteProposal } from "@/lib/proposals";
 import { addInstructionHistory } from "@/lib/instructionHistory";
+import { appendLog } from "@/lib/logs";
 
 /** Accept the currently pending proposal: write its content to ADAPTIVE.md,
  *  snapshot the previous content to history (tagged editor-agent), and
@@ -37,5 +38,15 @@ export async function POST(req: NextRequest) {
   } catch {
     /* ignored — see comment above */
   }
+  await appendLog({
+    kind: "proposal.accept",
+    actor: "user",
+    ok: true,
+    summary: "Lorenzo proposal accepted — ADAPTIVE.md updated",
+    meta: {
+      prevLength: prev.length,
+      newLength: proposal.proposedContent.length,
+    },
+  });
   return NextResponse.json({ ok: true });
 }

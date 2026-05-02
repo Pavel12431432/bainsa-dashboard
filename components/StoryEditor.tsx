@@ -138,8 +138,11 @@ export default function StoryEditor({ story, date, marco, onClose, onSaved }: Pr
     [historyUrl],
   );
 
-  async function saveStory(s: Story): Promise<boolean> {
-    const res = await apiFetch(`/api/stories/${date}/${s.index}/update`, s);
+  async function saveStory(
+    s: Story,
+    source: "manual" | "sofia" | "variant" = "manual",
+  ): Promise<boolean> {
+    const res = await apiFetch(`/api/stories/${date}/${s.index}/update?source=${source}`, s);
     if (res.ok) {
       saved.current = { ...s };
       onSaved(s);
@@ -169,7 +172,7 @@ export default function StoryEditor({ story, date, marco, onClose, onSaved }: Pr
     if (changedFields.length === 0) return;
     setPending({ before, after, changedFields, source, variantMode });
     setDraft(after);
-    if (await saveStory(after)) {
+    if (await saveStory(after, source === "variant" ? "variant" : "sofia")) {
       await recordHistory(after, labelFn(changedFields));
     }
   }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireFetch } from "@/lib/apiGuard";
 import { readProposal, writeProposal, StoredProposal } from "@/lib/proposals";
+import { appendLog } from "@/lib/logs";
 
 /** Revert the current proposal to its pre-refine state. One level only. */
 export async function POST(req: NextRequest) {
@@ -21,5 +22,11 @@ export async function POST(req: NextRequest) {
     refineHistory: (current.refineHistory ?? []).slice(0, -1),
   };
   await writeProposal(restored);
+  await appendLog({
+    kind: "proposal.undo-refine",
+    actor: "user",
+    ok: true,
+    summary: "Lorenzo refine undone",
+  });
   return NextResponse.json({ proposal: restored });
 }

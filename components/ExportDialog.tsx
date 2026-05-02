@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Story, PostedMap, PostRecord } from "@/types";
 import { captureStories, captureStoryToBlob } from "@/lib/exportCards";
+import { apiFetch } from "@/lib/fetch";
 
 interface Props {
   stories: Story[];
@@ -91,6 +92,12 @@ export default function ExportDialog({ stories, approvedIndices = [], posted = {
     try {
       await captureStories(toExport, date, format, (current, total) => {
         setProgress({ current, total });
+      });
+      void apiFetch("/api/logs", {
+        kind: "export",
+        ok: true,
+        summary: `Downloaded ${toExport.length} ${toExport.length === 1 ? "story" : "stories"} as ${format}`,
+        meta: { date, format, count: toExport.length, indices: toExport.map((s) => s.index) },
       });
     } finally {
       setExporting(false);

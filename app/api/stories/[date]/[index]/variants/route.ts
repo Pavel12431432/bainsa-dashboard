@@ -6,6 +6,7 @@ import { requireEnv } from "@/lib/env";
 import { requireFetch, validateStoryParams } from "@/lib/apiGuard";
 import { chatWithAgent, buildVariantsMessage, parseVariantsResponse } from "@/lib/openclaw";
 import { readVariants, addVariants } from "@/lib/variants";
+import { appendLog } from "@/lib/logs";
 
 const BATCH_SIZE = 3;
 
@@ -48,9 +49,20 @@ export async function POST(
   const userMessage = buildVariantsMessage(story, BATCH_SIZE);
 
   try {
-    const content = await chatWithAgent("sofia", sessionId, userMessage);
+    const content = await chatWithAgent("sofia", sessionId, userMessage, {
+      mode: "variants",
+      date,
+      storyIndex: idxNum,
+    });
     const parsed = parseVariantsResponse(content);
     const variants = await addVariants(date, idxNum, parsed.slice(0, BATCH_SIZE));
+    await appendLog({
+      kind: "variants.generate",
+      actor: "user",
+      ok: true,
+      summary: `Generated ${parsed.length} variants for story #${idxNum} on ${date}`,
+      meta: { date, storyIndex: idxNum, count: parsed.length },
+    });
     return NextResponse.json({ variants });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";

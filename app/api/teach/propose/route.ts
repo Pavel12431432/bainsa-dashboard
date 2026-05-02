@@ -4,6 +4,7 @@ import { collectFeedback } from "@/lib/editorFeedback";
 import { runEditorAgent } from "@/lib/editorAgent";
 import { readProposal, writeProposal, deleteProposal, StoredProposal } from "@/lib/proposals";
 import { computeFreshWarnings } from "@/lib/proposalWarnings";
+import { appendLog } from "@/lib/logs";
 
 export async function GET() {
   const proposal = await readProposal();
@@ -53,6 +54,20 @@ export async function POST(req: NextRequest) {
     };
     await writeProposal(stored);
 
+    await appendLog({
+      kind: "proposal.generate",
+      actor: "user",
+      ok: true,
+      summary: `Lorenzo proposal generated (${proposal.status}, ${days}d window)`,
+      meta: {
+        status: proposal.status,
+        windowDays: days,
+        hasFocus: !!focus,
+        warningCount: warnings.length,
+        rationaleCount: proposal.rationale?.length ?? 0,
+      },
+    });
+
     return NextResponse.json({ proposal: stored });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
@@ -64,5 +79,11 @@ export async function DELETE(req: NextRequest) {
   const csrf = requireFetch(req);
   if (csrf) return csrf;
   await deleteProposal();
+  await appendLog({
+    kind: "proposal.reject",
+    actor: "user",
+    ok: true,
+    summary: "Lorenzo proposal rejected/dismissed",
+  });
   return NextResponse.json({ ok: true });
 }

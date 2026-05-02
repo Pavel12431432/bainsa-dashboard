@@ -4,6 +4,7 @@ import { collectFeedback } from "@/lib/editorFeedback";
 import { runEditorAgent } from "@/lib/editorAgent";
 import { readProposal, writeProposal, StoredProposal } from "@/lib/proposals";
 import { computeRefineWarnings } from "@/lib/proposalWarnings";
+import { appendLog } from "@/lib/logs";
 
 /** Refine the currently-pending proposal with a free-text nudge. Requires
  *  a pending proposal on disk — if there isn't one we return 400 rather than
@@ -56,6 +57,19 @@ export async function POST(req: NextRequest) {
       ...(warnings.length ? { warnings } : {}),
     };
     await writeProposal(stored);
+
+    await appendLog({
+      kind: "proposal.refine",
+      actor: "user",
+      ok: true,
+      summary: `Lorenzo proposal refined (${refined.status})`,
+      meta: {
+        status: refined.status,
+        nudgeLength: nudge.length,
+        refineDepth: stored.refineHistory?.length ?? 0,
+        warningCount: warnings.length,
+      },
+    });
 
     return NextResponse.json({ proposal: stored });
   } catch (err) {

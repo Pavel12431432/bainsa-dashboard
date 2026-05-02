@@ -9,7 +9,8 @@
     "deploy": "next build && sudo systemctl restart bainsa-dashboard",
     "lint": "eslint",
     "editor-agent:test": "tsx scripts/testEditorAgent.ts",
-    "stub-proposal": "tsx scripts/stubProposal.ts"
+    "stub-proposal": "tsx scripts/stubProposal.ts",
+    "logs:prune": "tsx scripts/pruneLogs.ts"
   },
   "dependencies": {
     "html2canvas-pro": "^2.0.2",

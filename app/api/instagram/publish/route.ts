@@ -5,6 +5,7 @@ import { saveImage, scheduleDelete, deleteImage } from "@/lib/igTempStore";
 import { publishStory } from "@/lib/instagram";
 import { addPostRecord } from "@/lib/posted";
 import { isValidDate } from "@/lib/date";
+import { appendLog } from "@/lib/logs";
 
 export async function POST(req: NextRequest) {
   const guard = requireFetch(req);
@@ -47,6 +48,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Image save failed: ${message}` }, { status: 500 });
   }
 
+  const start = Date.now();
   try {
     const result = await publishStory(imageUrl);
     console.log(`[ig-publish] success, mediaId=${result.mediaId}`);
@@ -62,11 +64,40 @@ export async function POST(req: NextRequest) {
         console.error(`[ig-publish] failed to record post: ${err instanceof Error ? err.message : err}`);
       }
     }
+    await appendLog({
+      kind: "ig.post",
+      actor: "user",
+      ok: true,
+      durationMs: Date.now() - start,
+      summary: trackPost
+        ? `Posted story #${storyIndex} on ${date} to Instagram`
+        : `Posted untracked image to Instagram`,
+      meta: {
+        date,
+        storyIndex: trackPost ? storyIndex : undefined,
+        mediaId: result.mediaId,
+        containerId: result.containerId,
+      },
+    });
     return NextResponse.json({ mediaId: result.mediaId, containerId: result.containerId });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error(`[ig-publish] failed: ${message}`);
     deleteImage(storedKey).catch(() => {});
+    await appendLog({
+      kind: "ig.post",
+      actor: "user",
+      ok: false,
+      durationMs: Date.now() - start,
+      summary: trackPost
+        ? `Failed to post story #${storyIndex} on ${date}`
+        : `Failed to post image to Instagram`,
+      meta: {
+        date,
+        storyIndex: trackPost ? storyIndex : undefined,
+        error: message,
+      },
+    });
     return NextResponse.json({ error: message }, { status: 502 });
   }
 }

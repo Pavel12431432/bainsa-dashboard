@@ -4,6 +4,7 @@ import path from "path";
 import { Story } from "@/types";
 import { VARIANT_FIELDS } from "@/lib/storyUtils";
 import type { NewVariant } from "@/lib/variants";
+import { appendLog } from "@/lib/logs";
 
 const AGENT_CLI_NAMES = {
   marco: "news-researcher",
@@ -89,11 +90,57 @@ function demoResponse(agent: AgentId, message: string): string {
   return `**Demo mode** — ${who} isn't actually running. In production I'd respond to:\n\n> ${message.slice(0, 200)}${message.length > 200 ? "…" : ""}\n\nSet \`DEMO_MODE=false\` and configure OpenClaw to get real agent responses.`;
 }
 
-export function chatWithAgent(
+export interface AgentCallContext {
+  actor?: "user" | "system";
+  mode?: string;
+  date?: string;
+  storyIndex?: number;
+}
+
+export async function chatWithAgent(
   agent: AgentId,
   sessionId: string,
   message: string,
+  context?: AgentCallContext,
 ): Promise<string> {
+  const start = Date.now();
+  const actor = context?.actor ?? "user";
+  const meta: Record<string, unknown> = {
+    agent,
+    sessionId,
+    promptLength: message.length,
+    promptPreview: message.slice(0, 200),
+  };
+  if (context?.mode) meta.mode = context.mode;
+  if (context?.date) meta.date = context.date;
+  if (typeof context?.storyIndex === "number") meta.storyIndex = context.storyIndex;
+  if (process.env.DEMO_MODE === "true") meta.demo = true;
+
+  try {
+    const text = await runAgent(agent, sessionId, message);
+    await appendLog({
+      kind: "agent.call",
+      actor,
+      ok: true,
+      durationMs: Date.now() - start,
+      summary: `${agent} call (${context?.mode ?? "chat"})`,
+      meta: { ...meta, responseLength: text.length },
+    });
+    return text;
+  } catch (err) {
+    await appendLog({
+      kind: "agent.call",
+      actor,
+      ok: false,
+      durationMs: Date.now() - start,
+      summary: `${agent} call failed (${context?.mode ?? "chat"})`,
+      meta: { ...meta, error: err instanceof Error ? err.message : String(err) },
+    });
+    throw err;
+  }
+}
+
+function runAgent(agent: AgentId, sessionId: string, message: string): Promise<string> {
   if (process.env.DEMO_MODE === "true") {
     return new Promise((resolve) => {
       setTimeout(() => resolve(demoResponse(agent, message)), 600);

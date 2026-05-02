@@ -43,6 +43,9 @@ yarn-error.log*
 /samples/stories/*.posted.json
 /samples/instructions/ADAPTIVE.history.json
 
+# audit logs
+/logs/
+
 # vercel
 .vercel
 

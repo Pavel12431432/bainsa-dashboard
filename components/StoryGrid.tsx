@@ -115,6 +115,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
         message: `Marco updated handoffs/${date}.md. Reconcile stories/${date}.md with it: read both files, match each existing story to a Marco item, keep stories whose source is unchanged EXACTLY as-is, add new stories only for Marco items that have no matching story yet, and update only stories whose source material actually changed. Do not rewrite stories that don't need to change. Do not ask for confirmation.`,
         sessionId,
         newSession: true,
+        mode: "regenerate",
       });
       markRegenerated(d);
       document.dispatchEvent(new CustomEvent("stories-changed"));

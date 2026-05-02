@@ -3,6 +3,7 @@ import { cookies, headers } from "next/headers";
 import { createToken, COOKIE_NAME, MAX_AGE } from "@/lib/auth";
 import { todayRome } from "@/lib/date";
 import { checkRateLimit, recordFailure, clearAttempts } from "@/lib/rateLimit";
+import { appendLog } from "@/lib/logs";
 
 async function login(formData: FormData) {
   "use server";
@@ -20,6 +21,13 @@ async function login(formData: FormData) {
 
   if (!expected || password !== expected) {
     recordFailure(ip);
+    await appendLog({
+      kind: "auth.login.failure",
+      actor: "user",
+      ok: false,
+      summary: `Failed login attempt from ${ip}`,
+      meta: { ip },
+    });
     const recheck = checkRateLimit(ip);
     if (!recheck.allowed) {
       redirect(`/login?error=locked&retry=${recheck.retryAfter}`);
@@ -28,6 +36,13 @@ async function login(formData: FormData) {
   }
 
   clearAttempts(ip);
+  await appendLog({
+    kind: "auth.login.success",
+    actor: "user",
+    ok: true,
+    summary: `Successful login from ${ip}`,
+    meta: { ip },
+  });
 
   const token = createToken();
   const jar = await cookies();
