@@ -22,10 +22,12 @@ import HistoryTimeline from "./HistoryTimeline";
 import ExploreView from "./ExploreView";
 import { Variant, ApplyMode } from "@/lib/variants";
 import { variantToPatch } from "@/lib/storyUtils";
+import type { MarcoStory } from "@/lib/marcoHandoff";
 
 interface Props {
   story: Story;
   date: string;
+  marco?: MarcoStory;
   onClose: () => void;
   onSaved: (updated: Story) => void;
 }
@@ -49,7 +51,7 @@ function getSessionId(date: string, index: number): string {
   return id;
 }
 
-export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
+export default function StoryEditor({ story, date, marco, onClose, onSaved }: Props) {
   const [draft, setDraft] = useState<Story>({ ...story });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -448,6 +450,30 @@ export default function StoryEditor({ story, date, onClose, onSaved }: Props) {
           )}
 
           <StoryFields draft={draft} onUpdate={update} disabled={isViewingHistory} />
+
+          {marco && (marco.reason || marco.url) && (
+            <div className="border-t border-border-light pt-3 flex flex-col gap-1">
+              <span className="text-[0.55rem] font-semibold tracking-[0.08em] text-muted">MARCO&rsquo;S ANGLE</span>
+              {marco.reason && (
+                <p className="text-[0.7rem] text-brand-white/55 leading-snug m-0">{marco.reason}</p>
+              )}
+              {marco.url && (
+                <a
+                  href={marco.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[0.65rem] text-muted hover:text-brand-white transition-colors break-all inline-flex items-center gap-1"
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M14 4h6v6" />
+                    <path d="M20 4l-9 9" />
+                    <path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5" />
+                  </svg>
+                  {marco.sourceLabel || marco.url}
+                </a>
+              )}
+            </div>
+          )}
 
           {error && <p className="text-accent-analysis text-[0.8rem] m-0">{error}</p>}
 

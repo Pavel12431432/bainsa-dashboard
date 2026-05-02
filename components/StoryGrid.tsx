@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from "react";
 import { Story, ApprovalState, PostedMap } from "@/types";
+import type { MarcoStoryMap } from "@/lib/marcoHandoff";
 import { apiFetch } from "@/lib/fetch";
 import { checkCompliance } from "@/lib/compliance";
 import { diffFields } from "@/lib/storyUtils";
@@ -18,6 +19,7 @@ interface Props {
   initialStories: Story[];
   initialApprovals: ApprovalState;
   initialPosted?: PostedMap;
+  initialMarco?: MarcoStoryMap;
   highlightIndex?: number;
 }
 
@@ -40,7 +42,7 @@ const DIVISION_COLORS: Record<Division, string> = {
   Analysis: "#fe6203",
 };
 
-export default function StoryGrid({ date, initialStories, initialApprovals, initialPosted = {}, highlightIndex }: Props) {
+export default function StoryGrid({ date, initialStories, initialApprovals, initialPosted = {}, initialMarco = {}, highlightIndex }: Props) {
   const [stories, setStories] = useState<Story[]>(initialStories);
   const storiesRef = useRef(stories);
   storiesRef.current = stories;
@@ -61,6 +63,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
   }, [highlightIndex]);
   const [approvals, setApprovals] = useState<ApprovalState>(initialApprovals);
   const [posted, setPosted] = useState<PostedMap>(initialPosted);
+  const [marco, setMarco] = useState<MarcoStoryMap>(initialMarco);
   const [editing, setEditing] = useState<Story | null>(null);
   const [showExport, setShowExport] = useState(false);
   const [toast, setToast] = useState<string>("");
@@ -161,6 +164,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
       });
       if (data.approvals) setApprovals(data.approvals);
       if (data.posted) setPosted(data.posted);
+      if (data.marco) setMarco(data.marco);
     } catch {}
   }, [date]);
 
@@ -267,6 +271,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
         <StoryEditor
           story={editing}
           date={date}
+          marco={marco[editing.index]}
           onClose={() => setEditing(null)}
           onSaved={handleSaved}
         />
@@ -334,6 +339,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
           const rejected = approvals.rejected.includes(story.index);
           const chatThinking = isStoryChatLoading(date, story.index);
           const chatUpdated = !chatThinking && isUpdatedUnseen(date, story.index);
+          const marcoEntry = marco[story.index];
 
           return (
             <div key={story.index} id={`story-${story.index}`} className="group/card">
@@ -368,6 +374,26 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
                   <div className="absolute bottom-2 left-2 right-2 group-hover/card:opacity-0 transition-opacity duration-150">
                     <ComplianceBadge result={compliance} />
                   </div>
+                )}
+
+                {/* Source link chip — top-right, hover-revealed (desktop only) */}
+                {marcoEntry?.url && (
+                  <a
+                    href={marcoEntry.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="group/src hidden sm:flex absolute top-3 right-3 z-20 items-center justify-center w-7 h-7 rounded-full bg-black/70 backdrop-blur-sm border border-border-mid text-brand-white opacity-0 group-hover/card:opacity-100 transition-opacity duration-150 hover:bg-black/90 hover:border-border-light"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M14 4h6v6" />
+                      <path d="M20 4l-9 9" />
+                      <path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5" />
+                    </svg>
+                    <span className="absolute top-full right-0 mt-1.5 px-2 py-1 rounded bg-border border border-border-mid text-[0.6rem] text-brand-white font-normal tracking-normal whitespace-nowrap opacity-0 group-hover/src:opacity-100 transition-opacity pointer-events-none z-50">
+                      {marcoEntry.sourceLabel || "View source"}
+                    </span>
+                  </a>
                 )}
 
                 {/* Action buttons — overlay bottom of card on hover (desktop only) */}
@@ -494,6 +520,23 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
                   </div>
                 )}
               </div>
+
+              {/* Source link — mobile only */}
+              {marcoEntry?.url && (
+                <a
+                  href={marcoEntry.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="sm:hidden mt-2 flex items-center justify-center gap-1.5 py-2 rounded-[5px] border border-border-mid bg-brand-black text-muted text-[0.65rem] font-semibold tracking-[0.06em]"
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M14 4h6v6" />
+                    <path d="M20 4l-9 9" />
+                    <path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5" />
+                  </svg>
+                  VIEW SOURCE
+                </a>
+              )}
 
               {/* Feedback preview for rejected cards */}
               {rejected && approvals.feedback?.[story.index] && rejectingIndex !== story.index && (
