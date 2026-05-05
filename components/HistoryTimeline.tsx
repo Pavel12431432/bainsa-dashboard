@@ -41,7 +41,7 @@ export default function HistoryTimeline({ entries, viewingIdx, onSelect, onResto
       )}
 
       {/* Entry list — newest first */}
-      <div className="max-h-56 overflow-y-auto" style={{ scrollbarColor: "#444 transparent" }}>
+      <div className="max-h-32 lg:max-h-56 overflow-y-auto" style={{ scrollbarColor: "#444 transparent" }}>
         {[...entries].reverse().map((entry, ri) => {
           const idx = entries.length - 1 - ri;
           const isActive = viewingIdx === idx;

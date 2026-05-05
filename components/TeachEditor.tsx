@@ -271,7 +271,7 @@ export default function TeachEditor({ fixed, adaptive, initialHistory, initialPr
             </span>
             <span className="text-[0.5rem] text-muted">(read-only)</span>
           </div>
-          <pre className="text-[0.7rem] leading-relaxed text-brand-white/60 font-mono whitespace-pre-wrap break-words bg-surface border border-border rounded-lg p-4 overflow-y-auto m-0 flex-1 min-h-0 max-lg:max-h-[40vh]">
+          <pre className="text-[0.7rem] leading-relaxed text-brand-white/60 font-mono whitespace-pre-wrap break-words bg-surface border border-border rounded-lg p-4 overflow-y-auto m-0 flex-1 min-h-0 max-lg:max-h-[20vh]">
             {fixed}
           </pre>
         </div>
