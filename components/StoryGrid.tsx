@@ -8,6 +8,7 @@ import { checkCompliance } from "@/lib/compliance";
 import { diffFields } from "@/lib/storyUtils";
 import { isStoryChatLoading, isUpdatedUnseen, clearUpdated, subscribe as subscribeChatTracker, getSnapshot as getChatTrackerSnapshot } from "@/lib/storyChatTracker";
 import { markRegenerating, clearRegenerating, isRegenerating, markRegenerated, clearRegenerated, isRegenerated, subscribe as subscribeRegen, getSnapshot as getRegenSnapshot } from "@/lib/regenerateTracker";
+import { isGenerating as isVariantsGenerating, subscribe as subscribeVariants, getSnapshot as getVariantsSnapshot } from "@/lib/variantsTracker";
 import StoryCard from "./StoryCard";
 import ComplianceBadge from "./ComplianceBadge";
 import StoryEditor from "./StoryEditor";
@@ -84,6 +85,8 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
 
   // Re-render when story chat loading/updated state changes
   useSyncExternalStore(subscribeChatTracker, getChatTrackerSnapshot);
+  // Re-render when variant generation state changes
+  useSyncExternalStore(subscribeVariants, getVariantsSnapshot);
 
   // Check if stories are stale (Marco updated after Sofia)
   const checkStale = useCallback(async () => {
@@ -339,6 +342,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
           const approved = approvals.approved.includes(story.index);
           const rejected = approvals.rejected.includes(story.index);
           const chatThinking = isStoryChatLoading(date, story.index);
+          const variantsGenerating = isVariantsGenerating(date, story.index);
           const chatUpdated = !chatThinking && isUpdatedUnseen(date, story.index);
           const marcoEntry = marco[story.index];
 
@@ -361,6 +365,15 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                     </svg>
                     <span className="text-[0.6rem] font-semibold text-brand-white opacity-70">Sofia</span>
+                  </div>
+                )}
+                {variantsGenerating && !chatThinking && (
+                  <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-black/70 backdrop-blur-sm z-10">
+                    <svg className="animate-spin h-3 w-3 text-brand-white" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    <span className="text-[0.6rem] font-semibold text-brand-white opacity-70">Variants</span>
                   </div>
                 )}
                 {chatUpdated && (
