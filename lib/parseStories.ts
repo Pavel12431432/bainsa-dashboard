@@ -84,8 +84,10 @@ function parseGhostAccent(val: string): GhostAccent {
 export function parseStories(markdown: string): Story[] {
   const stories: Story[] = [];
 
-  // Split on story section separators (--- lines)
-  const sections = markdown.split(/\n---\n/);
+  // Split on the `## Story N` heading boundary (lookahead keeps the heading
+  // attached to its section). This tolerates files where Sofia omitted the
+  // `---` separators between stories.
+  const sections = markdown.split(/(?=^##\s+Story\s+\d+)/m);
 
   for (const section of sections) {
     const titleMatch = section.match(/^##\s+Story\s+(\d+)(?::\s+(.+))?/m);
