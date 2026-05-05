@@ -68,6 +68,7 @@ html, body {
   background: var(--brand-black);
   color: var(--brand-white);
   min-height: 100%;
+  color-scheme: dark;
 }
 
 body {

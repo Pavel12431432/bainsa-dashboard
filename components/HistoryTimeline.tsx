@@ -14,7 +14,7 @@ export default function HistoryTimeline({ entries, viewingIdx, onSelect, onResto
   if (entries.length === 0) return null;
 
   return (
-    <div className="flex flex-col border border-border-mid rounded-lg">
+    <div className="flex flex-col bg-surface border border-border-mid rounded-lg overflow-hidden">
       {/* Viewing banner */}
       {viewingIdx !== null && (
         <div className="flex items-center justify-between gap-3 px-3.5 py-2 bg-border-light">
@@ -41,7 +41,7 @@ export default function HistoryTimeline({ entries, viewingIdx, onSelect, onResto
       )}
 
       {/* Entry list — newest first */}
-      <div className="max-h-40 overflow-y-auto">
+      <div className="max-h-56 overflow-y-auto" style={{ scrollbarColor: "#444 transparent" }}>
         {[...entries].reverse().map((entry, ri) => {
           const idx = entries.length - 1 - ri;
           const isActive = viewingIdx === idx;

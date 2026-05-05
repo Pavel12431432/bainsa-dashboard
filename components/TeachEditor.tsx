@@ -29,7 +29,6 @@ export default function TeachEditor({ fixed, adaptive, initialHistory, initialPr
   const [content, setContent] = useState(adaptive);
   const [savedContent, setSavedContent] = useState(adaptive);
   const [saving, setSaving] = useState(false);
-  const [fixedCollapsed, setFixedCollapsed] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>(initialHistory);
   const [viewingIdx, setViewingIdx] = useState<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -263,50 +262,18 @@ export default function TeachEditor({ fixed, adaptive, initialHistory, initialPr
         </div>
       )}
 
-      <div className="flex gap-0 flex-1 min-h-0 max-lg:flex-col max-lg:gap-6">
+      <div className="flex gap-6 flex-1 min-h-0 max-lg:flex-col">
         {/* Left column — FIXED.md (read-only) */}
-        <div className={`shrink-0 flex flex-col transition-all duration-200 max-lg:w-full ${fixedCollapsed ? "w-10" : "w-[420px]"}`}>
-          <div className={`flex items-center h-[34px] mb-3 shrink-0 ${fixedCollapsed ? "justify-center" : "gap-2"}`}>
-            <button
-              onClick={() => setFixedCollapsed(!fixedCollapsed)}
-              className="flex items-center gap-2 bg-transparent border-none cursor-pointer p-0 shrink-0"
-              title={fixedCollapsed ? "Show fixed instructions" : "Hide fixed instructions"}
-            >
-              {fixedCollapsed ? (
-                <svg width="6" height="10" viewBox="0 0 6 10" fill="none" className="text-muted">
-                  <path d="M1 9l4-4-4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              ) : (
-                <>
-                  <span className="text-[0.65rem] font-semibold text-brand-white opacity-25 tracking-[0.08em] uppercase">
-                    Fixed Instructions
-                  </span>
-                  <span className="text-[0.5rem] text-muted">(read-only)</span>
-                  <svg width="6" height="10" viewBox="0 0 6 10" fill="none" className="text-muted">
-                    <path d="M5 1L1 5l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </>
-              )}
-            </button>
+        <div className="shrink-0 w-[420px] max-lg:w-full flex flex-col min-h-0">
+          <div className="flex items-center h-[34px] mb-3 shrink-0 gap-2">
+            <span className="text-[0.65rem] font-semibold text-brand-white opacity-25 tracking-[0.08em] uppercase">
+              Fixed Instructions
+            </span>
+            <span className="text-[0.5rem] text-muted">(read-only)</span>
           </div>
-          {!fixedCollapsed && (
-            <pre className="text-[0.7rem] leading-relaxed text-brand-white/60 font-mono whitespace-pre-wrap break-words bg-surface border border-border rounded-lg p-4 overflow-y-auto m-0 mr-6 flex-1 min-h-0">
-              {fixed}
-            </pre>
-          )}
-          {fixedCollapsed && (
-            <div className="flex-1 flex items-start justify-center pt-4">
-              <button
-                onClick={() => setFixedCollapsed(false)}
-                className="bg-transparent border-none cursor-pointer p-0"
-                title="Show fixed instructions"
-              >
-                <span className="text-[0.6rem] font-semibold text-muted tracking-[0.08em] uppercase [writing-mode:vertical-lr] rotate-180">
-                  Fixed
-                </span>
-              </button>
-            </div>
-          )}
+          <pre className="text-[0.7rem] leading-relaxed text-brand-white/60 font-mono whitespace-pre-wrap break-words bg-surface border border-border rounded-lg p-4 overflow-y-auto m-0 flex-1 min-h-0 max-lg:max-h-[40vh]">
+            {fixed}
+          </pre>
         </div>
 
         {/* Right column — ADAPTIVE.md */}
