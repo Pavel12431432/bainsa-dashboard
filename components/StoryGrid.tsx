@@ -8,7 +8,7 @@ import { checkCompliance } from "@/lib/compliance";
 import { diffFields } from "@/lib/storyUtils";
 import { isStoryChatLoading, isUpdatedUnseen, clearUpdated, subscribe as subscribeChatTracker, getSnapshot as getChatTrackerSnapshot } from "@/lib/storyChatTracker";
 import { markRegenerating, clearRegenerating, isRegenerating, markRegenerated, clearRegenerated, isRegenerated, subscribe as subscribeRegen, getSnapshot as getRegenSnapshot } from "@/lib/regenerateTracker";
-import { isGenerating as isVariantsGenerating, subscribe as subscribeVariants, getSnapshot as getVariantsSnapshot } from "@/lib/variantsTracker";
+import { isGenerating as isVariantsGenerating, isReady as isVariantsReady, clearReady as clearVariantsReady, subscribe as subscribeVariants, getSnapshot as getVariantsSnapshot } from "@/lib/variantsTracker";
 import StoryCard from "./StoryCard";
 import ComplianceBadge from "./ComplianceBadge";
 import StoryEditor from "./StoryEditor";
@@ -343,6 +343,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
           const rejected = approvals.rejected.includes(story.index);
           const chatThinking = isStoryChatLoading(date, story.index);
           const variantsGenerating = isVariantsGenerating(date, story.index);
+          const variantsReady = !variantsGenerating && isVariantsReady(date, story.index);
           const chatUpdated = !chatThinking && isUpdatedUnseen(date, story.index);
           const marcoEntry = marco[story.index];
 
@@ -378,10 +379,20 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
                 )}
                 {chatUpdated && (
                   <div
-                    className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-success/15 border border-success/30 backdrop-blur-sm z-10 animate-[fadeOut_0.5s_ease_3s_forwards]"
+                    className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-black/70 backdrop-blur-sm z-10 animate-[fadeOut_0.5s_ease_3s_forwards]"
                     onAnimationEnd={() => clearUpdated(date, story.index)}
                   >
-                    <span className="text-[0.6rem] font-semibold text-success">Sofia updated</span>
+                    <span className="h-1.5 w-1.5 rounded-full bg-success shadow-[0_0_6px_rgba(34,197,94,0.7)]" />
+                    <span className="text-[0.6rem] font-semibold text-brand-white opacity-70">Sofia responded</span>
+                  </div>
+                )}
+                {variantsReady && !chatThinking && !chatUpdated && (
+                  <div
+                    className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-black/70 backdrop-blur-sm z-10 animate-[fadeOut_0.5s_ease_3s_forwards]"
+                    onAnimationEnd={() => clearVariantsReady(date, story.index)}
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-success shadow-[0_0_6px_rgba(34,197,94,0.7)]" />
+                    <span className="text-[0.6rem] font-semibold text-brand-white opacity-70">Variants ready</span>
                   </div>
                 )}
                 {!compliance.pass && (

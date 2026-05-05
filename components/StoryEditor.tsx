@@ -8,6 +8,8 @@ import {
   markGenerating,
   clearGenerating,
   isGenerating,
+  markReady as markVariantsReady,
+  clearReady as clearVariantsReady,
   subscribe as subscribeVariants,
   getSnapshot as getVariantsSnapshot,
 } from "@/lib/variantsTracker";
@@ -186,6 +188,10 @@ export default function StoryEditor({ story, date, marco, onClose, onSaved }: Pr
   const variantsUrl = `/api/stories/${date}/${story.index}/variants`;
 
   useEffect(() => {
+    if (mode === "explore") clearVariantsReady(date, story.index);
+  }, [mode, date, story.index]);
+
+  useEffect(() => {
     if (mode !== "explore" || variantsLoaded) return;
     fetch(variantsUrl)
       .then((r) => r.json())
@@ -204,6 +210,7 @@ export default function StoryEditor({ story, date, marco, onClose, onSaved }: Pr
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Generation failed");
       setVariants(data.variants ?? []);
+      markVariantsReady(date, story.index);
     } catch (err) {
       setVariantsError(err instanceof Error ? err.message : "Generation failed");
     } finally {
