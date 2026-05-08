@@ -2,6 +2,7 @@ import { mkdir, readdir, readFile, appendFile } from "fs/promises";
 import path from "path";
 import { fileExists } from "@/lib/fs";
 import { todayRome } from "@/lib/date";
+import { importCronRuns } from "@/lib/cronImport";
 
 export type LogKind =
   | "agent.call"
@@ -119,6 +120,7 @@ function matches(event: LogEvent, opts: QueryOptions, qLower: string | null): bo
 }
 
 export async function queryLogs(opts: QueryOptions = {}): Promise<QueryResult> {
+  await importCronRuns();
   const limit = Math.max(1, Math.min(opts.limit ?? DEFAULT_LIMIT, 500));
   const qLower = opts.q ? opts.q.toLowerCase() : null;
   const dates = await listLogDates();
@@ -131,7 +133,9 @@ export async function queryLogs(opts: QueryOptions = {}): Promise<QueryResult> {
     if (opts.to && date > opts.to.slice(0, 10)) continue;
 
     const dayEvents = await readDayEvents(date);
-    dayEvents.reverse();
+    // Sort by ts descending — append order isn't reliable when events are
+    // backfilled (e.g. cron import writes older runs into today's file).
+    dayEvents.sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0));
 
     for (const event of dayEvents) {
       // Resume strictly after the previous page's last ts. Events written
