@@ -38,7 +38,7 @@ npm run build   # then ask user to run: sudo systemctl restart bainsa-dashboard
 
 GitHub: `Pavel12431432/bainsa-dashboard` (private).
 
-**After committing and pushing**, review this CLAUDE.md and update it if anything has changed (new files, renamed components, changed formats, new gotchas, etc.). Keep it accurate so the next session doesn't have to rediscover things.
+**Before committing**, review this CLAUDE.md and update it in the same commit if anything has changed (new files, renamed components, changed formats, new gotchas, etc.). The doc should never lag HEAD — never push code, then commit a CLAUDE.md update afterwards.
 
 ## Important gotchas
 
@@ -406,6 +406,7 @@ interface ChatMessage {
 | `openclaw.ts` | OpenClaw client via Docker CLI (`docker exec openclaw openclaw agent`). `chatWithAgent(agent, sessionId, message)` supports `marco` / `sofia` / `lorenzo` (→ `news-researcher` / `story-generator` / `story-editor`). Also `buildUserMessage()` (story editing system prompt with date-aware body limits and bullet rules), `parseResponse()` (extracts JSON field updates from Sofia markdown), `buildVariantsMessage()` + `parseVariantsResponse()` (variants generation — returns typed `NewVariant[]`, validates all 11 fields). Demo-mode stubs cover all three agents. |
 | `variants.ts` | Variant storage module. Sidecar JSON at `{STORIES_PATH}/{date}.variants.json`, keyed by story index. `Variant` shape: 11 content+design fields (from `VARIANT_FIELDS`) + `id`, `batchId`, `generatedAt`, optional `appliedAt`/`appliedMode`/`dislikedAt`. `NewVariant` = content fields only (what Sofia returns). Exports `readVariants`, `addVariants` (assigns new `batchId`), `updateVariant` (explicit `delete` for undefined patch keys so `dislikedAt` cleanup is unambiguous). |
 | `fetch.ts` | Shared `apiFetch(url, body)` with `Content-Type` + `X-Requested-With: fetch` headers. |
+| `useOverlayClose.ts` | Hook returning `onMouseDown` + `onMouseUp` for modal overlays. Closes only when both mousedown AND mouseup land on the overlay itself — prevents drag-release-outside (e.g. selecting text inside and releasing on the backdrop) from closing the modal. Used by StoryEditor (main + fullscreen), ExportDialog (main + IG confirm), FeedbackInspector. |
 | `apiGuard.ts` | `requireFetch(req)` CSRF check (verifies `X-Requested-With: fetch` header) and `validateStoryParams(date, index)` route param validation. Returns an error `NextResponse` or `null`. |
 | `versionHistory.ts` | Generic JSON history I/O. `readEntries`/`addEntry` for flat arrays, `readKeyedEntries`/`addKeyedEntry` for `Record<string, T[]>` files. Caps at 50 entries. Used by `history.ts` and `instructionHistory.ts`. |
 | `history.ts` | Story version history sidecars. Thin wrapper over `versionHistory.ts` using keyed storage (`story index -> entries[]`). Applies `STORY_DEFAULTS` migration on read for fields added after existing history was written. |

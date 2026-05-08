@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Story, PostedMap, PostRecord } from "@/types";
 import { captureStories, captureStoryToBlob } from "@/lib/exportCards";
 import { apiFetch } from "@/lib/fetch";
+import { useOverlayClose } from "@/lib/useOverlayClose";
 
 interface Props {
   stories: Story[];
@@ -49,6 +50,10 @@ export default function ExportDialog({ stories, approvedIndices = [], posted = {
   const [igUsernameError, setIgUsernameError] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [confirmingIg, setConfirmingIg] = useState(false);
+  const overlayHandlers = useOverlayClose(() => {
+    if (!exporting) onClose();
+  });
+  const confirmOverlayHandlers = useOverlayClose(() => setConfirmingIg(false));
   // progress.current is fractional (e.g. 1.4 = 1 done + 40% through 2nd)
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [statusMsg, setStatusMsg] = useState<string>("");
@@ -194,7 +199,7 @@ export default function ExportDialog({ stories, approvedIndices = [], posted = {
   return (
     <div
       className="fixed inset-0 z-[100] bg-black/85 flex items-center justify-center p-6"
-      onClick={(e) => { if (e.target === e.currentTarget && !exporting) onClose(); }}
+      {...overlayHandlers}
     >
       <div className="w-full max-w-[480px] bg-surface border border-border-mid rounded-xl overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
@@ -357,7 +362,14 @@ export default function ExportDialog({ stories, approvedIndices = [], posted = {
       {confirmingIg && !exporting && (
         <div
           className="fixed inset-0 z-[110] bg-black/70 flex items-center justify-center p-6"
-          onClick={(e) => { if (e.target === e.currentTarget) setConfirmingIg(false); }}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            confirmOverlayHandlers.onMouseDown(e);
+          }}
+          onMouseUp={(e) => {
+            e.stopPropagation();
+            confirmOverlayHandlers.onMouseUp(e);
+          }}
         >
           <div className="w-full max-w-[380px] bg-surface-2 border border-border-mid rounded-xl overflow-hidden shadow-2xl">
             <div className="px-6 pt-6 pb-5">

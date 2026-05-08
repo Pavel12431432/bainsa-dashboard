@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from "react";
 import { Story, HistoryEntry, ACCENT_COLORS } from "@/types";
 import { apiFetch } from "@/lib/fetch";
+import { useOverlayClose } from "@/lib/useOverlayClose";
 import { clearUpdated } from "@/lib/storyChatTracker";
 import {
   markGenerating,
@@ -74,6 +75,11 @@ export default function StoryEditor({ story, date, marco, onClose, onSaved }: Pr
   const [showHistory, setShowHistory] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [fullscreenStory, setFullscreenStory] = useState<Story | null>(null);
+  const overlayHandlers = useOverlayClose(onClose);
+  const fullscreenOverlayHandlers = useOverlayClose(() => {
+    setFullscreen(false);
+    setFullscreenStory(null);
+  });
   const [viewingIdx, setViewingIdx] = useState<number | null>(null);
   const [mode, setMode] = useState<"editor" | "explore">("editor");
   const [variants, setVariants] = useState<Variant[]>([]);
@@ -313,7 +319,7 @@ export default function StoryEditor({ story, date, marco, onClose, onSaved }: Pr
 
   return (
     <div
-      onClick={onClose}
+      {...overlayHandlers}
       className="fixed inset-0 z-[100] bg-black/85 flex items-center justify-center p-6 max-md:p-0"
     >
       <div
@@ -530,7 +536,14 @@ export default function StoryEditor({ story, date, marco, onClose, onSaved }: Pr
       {/* Fullscreen preview overlay */}
       {fullscreen && (
         <div
-          onClick={(e) => { e.stopPropagation(); setFullscreen(false); setFullscreenStory(null); }}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            fullscreenOverlayHandlers.onMouseDown(e);
+          }}
+          onMouseUp={(e) => {
+            e.stopPropagation();
+            fullscreenOverlayHandlers.onMouseUp(e);
+          }}
           className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center cursor-pointer"
         >
           <div onClick={(e) => e.stopPropagation()} className="cursor-default">

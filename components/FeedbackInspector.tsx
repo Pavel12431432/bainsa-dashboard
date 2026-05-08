@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { FeedbackBundle } from "@/lib/editorFeedback";
+import { useOverlayClose } from "@/lib/useOverlayClose";
 
 type TabKey = "rejections" | "edits" | "variants" | "approvals";
 
@@ -43,6 +44,7 @@ export default function FeedbackInspector({
   highlightRefs,
   reviewOnly,
 }: Props) {
+  const overlayHandlers = useOverlayClose(onClose);
   const [days, setDays] = useState<number>(14);
   const [bundle, setBundle] = useState<FeedbackBundle | null>(null);
   const [loading, setLoading] = useState(false);
@@ -101,7 +103,7 @@ export default function FeedbackInspector({
   return (
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
-      onClick={onClose}
+      {...overlayHandlers}
     >
       <div
         className="bg-surface border border-border-mid rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col"
