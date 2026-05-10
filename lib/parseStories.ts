@@ -1,4 +1,4 @@
-import { Story, Layout, ContentType, HeadlineSize, BodyWeight, TextAlign, CornerSize, AccentBar, GhostAccent } from "@/types";
+import { Story, Layout, ContentType, HeadlineSize, BodyWeight, TextAlign, CornerSize, AccentBar, GhostAccent, ChainRole } from "@/types";
 
 function extractField(block: string, key: string): string {
   const re = new RegExp(`\\*\\*${key}:\\*\\*[ \\t]*(.+)`, "i");
@@ -81,6 +81,13 @@ function parseGhostAccent(val: string): GhostAccent {
   return "none";
 }
 
+function parseChainRole(val: unknown): ChainRole | undefined {
+  if (typeof val !== "string") return undefined;
+  const v = val.toLowerCase().trim();
+  if (v === "hook" || v === "develop" || v === "closer") return v;
+  return undefined;
+}
+
 export function parseStories(markdown: string): Story[] {
   const stories: Story[] = [];
 
@@ -104,6 +111,8 @@ export function parseStories(markdown: string): Story[] {
         stories.push({
           index,
           title,
+          chain: typeof data.chain === "string" && data.chain.trim() ? data.chain.trim() : undefined,
+          chainRole: parseChainRole(data.chainRole),
           division: data.division ?? "Analysis",
           accentColor: data.accentColor ?? "#fe6203",
           layout: parseLayout(data.layout ?? data.layoutTemplate ?? ""),
@@ -126,9 +135,13 @@ export function parseStories(markdown: string): Story[] {
     }
 
     // Regex parser — new fields fall back to defaults when missing (backward compat)
+    const chainStr = extractField(section, "Chain");
+    const chainRoleStr = extractField(section, "Chain role");
     stories.push({
       index,
       title,
+      chain: chainStr || undefined,
+      chainRole: parseChainRole(chainRoleStr),
       division: extractField(section, "Division") || "Analysis",
       accentColor: extractField(section, "Accent color") || "#fe6203",
       layout: parseLayout(extractField(section, "Layout")),

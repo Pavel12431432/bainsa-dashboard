@@ -13,7 +13,10 @@ import StoryCard from "./StoryCard";
 import ComplianceBadge from "./ComplianceBadge";
 import StoryEditor from "./StoryEditor";
 import ExportDialog from "./ExportDialog";
+import ChainStack from "./ChainStack";
+import ChainFullscreen from "./ChainFullscreen";
 
+type StoryGroup = { kind: "single"; story: Story } | { kind: "chain"; chain: string; stories: Story[] };
 
 interface Props {
   date: string;
@@ -68,6 +71,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
   const [editing, setEditing] = useState<Story | null>(null);
   const [showExport, setShowExport] = useState(false);
   const [toast, setToast] = useState<string>("");
+  const [fullscreenChain, setFullscreenChain] = useState<StoryGroup | null>(null);
 
   useEffect(() => {
     if (!toast) return;
@@ -75,7 +79,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
     return () => clearTimeout(id);
   }, [toast]);
   const [stale, setStale] = useState<string | null>(null); // Marco's lastRun if stale
-  useSyncExternalStore(subscribeRegen, getRegenSnapshot);
+  useSyncExternalStore(subscribeRegen, getRegenSnapshot, getRegenSnapshot);
   const regenerating = isRegenerating(date);
   const [rejectingIndex, setRejectingIndex] = useState<number | null>(null);
   const feedbackRef = useRef<HTMLTextAreaElement | null>(null);
@@ -84,9 +88,9 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
   }, []);
 
   // Re-render when story chat loading/updated state changes
-  useSyncExternalStore(subscribeChatTracker, getChatTrackerSnapshot);
+  useSyncExternalStore(subscribeChatTracker, getChatTrackerSnapshot, getChatTrackerSnapshot);
   // Re-render when variant generation state changes
-  useSyncExternalStore(subscribeVariants, getVariantsSnapshot);
+  useSyncExternalStore(subscribeVariants, getVariantsSnapshot, getVariantsSnapshot);
 
   // Check if stories are stale (Marco updated after Sofia)
   const checkStale = useCallback(async () => {
@@ -336,8 +340,23 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
         </div>
       )}
 
-      <div className="grid gap-8 grid-cols-4 max-lg:grid-cols-[repeat(auto-fill,minmax(min(280px,100%),1fr))] max-sm:grid-cols-1 max-sm:max-w-[405px] max-sm:mx-auto">
-        {visibleStories.map((story) => {
+      {(() => {
+        // Group consecutive same-chain stories together; standalones stay isolated.
+        const groups: StoryGroup[] = [];
+        for (const story of visibleStories) {
+          if (story.chain) {
+            const last = groups[groups.length - 1];
+            if (last && last.kind === "chain" && last.chain === story.chain) {
+              last.stories.push(story);
+              continue;
+            }
+            groups.push({ kind: "chain", chain: story.chain, stories: [story] });
+          } else {
+            groups.push({ kind: "single", story });
+          }
+        }
+
+        const renderCardVisual = (story: Story, isTop: boolean) => {
           const compliance = checkCompliance(story);
           const approved = approvals.approved.includes(story.index);
           const rejected = approvals.rejected.includes(story.index);
@@ -348,81 +367,80 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
           const marcoEntry = marco[story.index];
 
           return (
-            <div key={story.index} id={`story-${story.index}`} className="group/card">
-              {/* Card */}
-              <div className="relative w-full">
-                <StoryCard story={story} />
+            <div className="group/card relative w-full">
+              <StoryCard story={story} />
 
-                {approved && (
-                  <div className="absolute inset-0 rounded-2xl border border-success/30 pointer-events-none" style={{ boxShadow: "0 0 16px rgba(34,197,94,0.4), 0 0 40px rgba(34,197,94,0.15)" }} />
-                )}
-                {(rejected || rejectingIndex === story.index) && (
-                  <div className="absolute inset-0 rounded-2xl border border-danger/25 bg-black/45 pointer-events-none" style={{ boxShadow: "0 0 16px rgba(239,68,68,0.35), 0 0 40px rgba(239,68,68,0.12)" }} />
-                )}
-                {chatThinking && (
-                  <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-black/70 backdrop-blur-sm z-10">
-                    <svg className="animate-spin h-3 w-3 text-brand-white" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    <span className="text-[0.6rem] font-semibold text-brand-white opacity-70">Sofia</span>
-                  </div>
-                )}
-                {variantsGenerating && !chatThinking && (
-                  <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-black/70 backdrop-blur-sm z-10">
-                    <svg className="animate-spin h-3 w-3 text-brand-white" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    <span className="text-[0.6rem] font-semibold text-brand-white opacity-70">Variants</span>
-                  </div>
-                )}
-                {chatUpdated && (
-                  <div
-                    className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-black/70 backdrop-blur-sm z-10 animate-[fadeOut_0.5s_ease_3s_forwards]"
-                    onAnimationEnd={() => clearUpdated(date, story.index)}
-                  >
-                    <span className="h-1.5 w-1.5 rounded-full bg-success shadow-[0_0_6px_rgba(34,197,94,0.7)]" />
-                    <span className="text-[0.6rem] font-semibold text-brand-white opacity-70">Sofia responded</span>
-                  </div>
-                )}
-                {variantsReady && !chatThinking && !chatUpdated && (
-                  <div
-                    className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-black/70 backdrop-blur-sm z-10 animate-[fadeOut_0.5s_ease_3s_forwards]"
-                    onAnimationEnd={() => clearVariantsReady(date, story.index)}
-                  >
-                    <span className="h-1.5 w-1.5 rounded-full bg-success shadow-[0_0_6px_rgba(34,197,94,0.7)]" />
-                    <span className="text-[0.6rem] font-semibold text-brand-white opacity-70">Variants ready</span>
-                  </div>
-                )}
-                {!compliance.pass && (
-                  <div className="absolute bottom-2 left-2 right-2 group-hover/card:opacity-0 transition-opacity duration-150">
-                    <ComplianceBadge result={compliance} />
-                  </div>
-                )}
+              {isTop && approved && (
+                <div className="absolute inset-0 rounded-2xl border border-success/30 pointer-events-none" style={{ boxShadow: "0 0 16px rgba(34,197,94,0.4), 0 0 40px rgba(34,197,94,0.15)" }} />
+              )}
+              {isTop && (rejected || rejectingIndex === story.index) && (
+                <div className="absolute inset-0 rounded-2xl border border-danger/25 bg-black/45 pointer-events-none" style={{ boxShadow: "0 0 16px rgba(239,68,68,0.35), 0 0 40px rgba(239,68,68,0.12)" }} />
+              )}
+              {isTop && chatThinking && (
+                <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-black/70 backdrop-blur-sm z-10">
+                  <svg className="animate-spin h-3 w-3 text-brand-white" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <span className="text-[0.6rem] font-semibold text-brand-white opacity-70">Sofia</span>
+                </div>
+              )}
+              {isTop && variantsGenerating && !chatThinking && (
+                <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-black/70 backdrop-blur-sm z-10">
+                  <svg className="animate-spin h-3 w-3 text-brand-white" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <span className="text-[0.6rem] font-semibold text-brand-white opacity-70">Variants</span>
+                </div>
+              )}
+              {isTop && chatUpdated && (
+                <div
+                  className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-black/70 backdrop-blur-sm z-10 animate-[fadeOut_0.5s_ease_3s_forwards]"
+                  onAnimationEnd={() => clearUpdated(date, story.index)}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-success shadow-[0_0_6px_rgba(34,197,94,0.7)]" />
+                  <span className="text-[0.6rem] font-semibold text-brand-white opacity-70">Sofia responded</span>
+                </div>
+              )}
+              {isTop && variantsReady && !chatThinking && !chatUpdated && (
+                <div
+                  className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-black/70 backdrop-blur-sm z-10 animate-[fadeOut_0.5s_ease_3s_forwards]"
+                  onAnimationEnd={() => clearVariantsReady(date, story.index)}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-success shadow-[0_0_6px_rgba(34,197,94,0.7)]" />
+                  <span className="text-[0.6rem] font-semibold text-brand-white opacity-70">Variants ready</span>
+                </div>
+              )}
+              {isTop && !compliance.pass && (
+                <div className="absolute bottom-2 left-2 right-2 group-hover/card:opacity-0 transition-opacity duration-150">
+                  <ComplianceBadge result={compliance} />
+                </div>
+              )}
 
-                {/* Source link chip — top-right, hover-revealed (desktop only) */}
-                {marcoEntry?.url && (
-                  <a
-                    href={marcoEntry.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="group/src hidden sm:flex absolute top-3 right-3 z-20 items-center justify-center w-7 h-7 rounded-full bg-black/70 backdrop-blur-sm border border-border-mid text-brand-white opacity-0 group-hover/card:opacity-100 transition-opacity duration-150 hover:bg-black/90 hover:border-border-light"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M14 4h6v6" />
-                      <path d="M20 4l-9 9" />
-                      <path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5" />
-                    </svg>
-                    <span className="absolute top-full right-0 mt-1.5 px-2 py-1 rounded bg-border border border-border-mid text-[0.6rem] text-brand-white font-normal tracking-normal whitespace-nowrap opacity-0 group-hover/src:opacity-100 transition-opacity pointer-events-none z-50">
-                      {marcoEntry.sourceLabel || "View source"}
-                    </span>
-                  </a>
-                )}
+              {/* Source link chip — top-right, hover-revealed (desktop only) */}
+              {isTop && marcoEntry?.url && (
+                <a
+                  href={marcoEntry.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="group/src hidden sm:flex absolute top-3 right-3 z-20 items-center justify-center w-7 h-7 rounded-full bg-black/70 backdrop-blur-sm border border-border-mid text-brand-white opacity-0 group-hover/card:opacity-100 transition-opacity duration-150 hover:bg-black/90 hover:border-border-light"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M14 4h6v6" />
+                    <path d="M20 4l-9 9" />
+                    <path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5" />
+                  </svg>
+                  <span className="absolute top-full right-0 mt-1.5 px-2 py-1 rounded bg-border border border-border-mid text-[0.6rem] text-brand-white font-normal tracking-normal whitespace-nowrap opacity-0 group-hover/src:opacity-100 transition-opacity pointer-events-none z-50">
+                    {marcoEntry.sourceLabel || "View source"}
+                  </span>
+                </a>
+              )}
 
-                {/* Action buttons — overlay bottom of card on hover (desktop only) */}
-                <div className={`hidden sm:flex absolute bottom-0 left-0 right-0 rounded-b-2xl px-5 pb-5 pt-16 bg-gradient-to-t from-black/90 to-transparent transition-opacity duration-150 gap-2 ${
+              {/* Action buttons — overlay bottom of card on hover (desktop only) */}
+              {isTop && (
+                <div data-stack-no-cycle className={`hidden sm:flex absolute bottom-0 left-0 right-0 rounded-b-2xl px-5 pb-5 pt-16 bg-gradient-to-t from-black/90 to-transparent transition-opacity duration-150 gap-2 ${
                   rejectingIndex === story.index ? "opacity-100 flex-col" : "opacity-0 group-hover/card:opacity-100"
                 }`}>
                   {rejectingIndex === story.index ? (
@@ -439,13 +457,13 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
                       />
                       <div className="flex gap-2">
                         <button
-                          onClick={() => skipReject(story.index)}
+                          onClick={(e) => { e.stopPropagation(); skipReject(story.index); }}
                           className={`${actionBtn} border border-border-mid bg-brand-black/80 text-muted backdrop-blur-sm`}
                         >
                           SKIP
                         </button>
                         <button
-                          onClick={() => submitReject(story.index)}
+                          onClick={(e) => { e.stopPropagation(); submitReject(story.index); }}
                           className={`${actionBtn} border border-danger/40 bg-danger/15 text-danger backdrop-blur-sm`}
                         >
                           SUBMIT
@@ -455,13 +473,13 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
                   ) : (
                     <>
                       <button
-                        onClick={() => setEditing(story)}
+                        onClick={(e) => { e.stopPropagation(); setEditing(story); }}
                         className={`${actionBtn} border border-border-mid bg-brand-black/80 text-brand-white backdrop-blur-sm`}
                       >
                         EDIT
                       </button>
                       <button
-                        onClick={() => handleApprove(story.index, approved ? "clear" : "approve")}
+                        onClick={(e) => { e.stopPropagation(); handleApprove(story.index, approved ? "clear" : "approve"); }}
                         className={`${actionBtn} border backdrop-blur-sm ${
                           approved
                             ? "border-success bg-success/20 text-success"
@@ -471,7 +489,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
                         {approved ? "✓" : "APPROVE"}
                       </button>
                       <button
-                        onClick={() => rejected ? handleApprove(story.index, "clear") : startReject(story.index)}
+                        onClick={(e) => { e.stopPropagation(); rejected ? handleApprove(story.index, "clear") : startReject(story.index); }}
                         className={`${actionBtn} border backdrop-blur-sm ${
                           rejected
                             ? "border-danger bg-danger/20 text-danger"
@@ -483,8 +501,17 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
                     </>
                   )}
                 </div>
-              </div>
+              )}
+            </div>
+          );
+        };
 
+        const renderActions = (story: Story) => {
+          const approved = approvals.approved.includes(story.index);
+          const rejected = approvals.rejected.includes(story.index);
+          const marcoEntry = marco[story.index];
+          return (
+            <>
               {/* Action buttons — below card (mobile only) */}
               <div className="flex sm:hidden flex-col gap-2 mt-2">
                 {rejectingIndex === story.index ? (
@@ -569,10 +596,44 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
                   {approvals.feedback[story.index]}
                 </p>
               )}
-            </div>
+            </>
           );
-        })}
-      </div>
+        };
+
+        return (
+          <div className="grid gap-8 grid-cols-4 max-lg:grid-cols-[repeat(auto-fill,minmax(min(280px,100%),1fr))] max-sm:grid-cols-1 max-sm:max-w-[405px] max-sm:mx-auto">
+            {groups.map((g) => {
+              if (g.kind === "single") {
+                return (
+                  <div key={g.story.index} id={`story-${g.story.index}`}>
+                    {renderCardVisual(g.story, true)}
+                    {renderActions(g.story)}
+                  </div>
+                );
+              }
+              return (
+                <ChainStack
+                  key={`chain-${g.chain}-${g.stories[0].index}`}
+                  chain={g.chain}
+                  stories={g.stories}
+                  renderCardVisual={renderCardVisual}
+                  renderActions={renderActions}
+                  onExpand={() => setFullscreenChain(g)}
+                />
+              );
+            })}
+          </div>
+        );
+      })()}
+
+      {/* Fullscreen chain carousel — IG-style swipe through chain stories */}
+      {fullscreenChain && fullscreenChain.kind === "chain" && (
+        <ChainFullscreen
+          chain={fullscreenChain.chain}
+          stories={fullscreenChain.stories}
+          onClose={() => setFullscreenChain(null)}
+        />
+      )}
 
       <div className="mt-10 flex justify-center">
         <button

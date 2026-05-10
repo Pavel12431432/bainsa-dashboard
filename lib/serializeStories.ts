@@ -1,11 +1,14 @@
 import { Story } from "@/types";
 
 export function serializeStory(story: Story): string {
+  const chainBlock = story.chain && story.chainRole
+    ? `**Chain:** ${story.chain}\n**Chain role:** ${story.chainRole}\n\n`
+    : "";
   return `
 ---
 ## Story ${story.index}
 
-**Division:** ${story.division}
+${chainBlock}**Division:** ${story.division}
 **Accent color:** ${story.accentColor}
 **Layout:** ${story.layout}
 **Content type:** ${story.contentType}
