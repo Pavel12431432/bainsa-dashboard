@@ -37,7 +37,7 @@ export default function HeaderShell({ date }: { date?: string }) {
 
   return (
     <>
-      <header className="relative flex items-center gap-3 px-5 py-4 border-b border-border sticky top-0 bg-brand-black z-10 max-sm:gap-2 max-sm:px-4 max-sm:py-3">
+      <header className="relative flex items-center gap-3 px-5 py-4 border-b border-border sticky top-0 bg-brand-black z-30 max-sm:gap-2 max-sm:px-4 max-sm:py-3">
         {/* Hamburger */}
         <button
           onClick={() => setPanel(panel === "menu" ? null : "menu")}
