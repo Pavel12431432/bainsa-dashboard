@@ -29,7 +29,7 @@ const CATEGORY_OPTIONS: { value: Category; label: string }[] = [
 const CATEGORY_KINDS: Record<Category, LogKind[]> = {
   all: [],
   agents: ["agent.call"],
-  stories: ["story.approve", "story.reject", "story.edit", "variants.generate"],
+  stories: ["story.approve", "story.reject", "story.edit", "variants.generate", "story.generate-more"],
   teach: [
     "proposal.generate",
     "proposal.accept",
@@ -56,6 +56,7 @@ const KIND_COLORS: Record<LogKind, string> = {
   "story.reject": "text-danger",
   "story.edit": "text-brand-white",
   "variants.generate": "text-accent-projects",
+  "story.generate-more": "text-accent-projects",
   "export": "text-brand-white",
   "auth.login.success": "text-muted",
   "auth.login.failure": "text-danger",

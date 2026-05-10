@@ -9,10 +9,19 @@ import { diffFields } from "@/lib/storyUtils";
 import { isStoryChatLoading, isUpdatedUnseen, clearUpdated, subscribe as subscribeChatTracker, getSnapshot as getChatTrackerSnapshot } from "@/lib/storyChatTracker";
 import { markRegenerating, clearRegenerating, isRegenerating, markRegenerated, clearRegenerated, isRegenerated, subscribe as subscribeRegen, getSnapshot as getRegenSnapshot } from "@/lib/regenerateTracker";
 import { isGenerating as isVariantsGenerating, isReady as isVariantsReady, clearReady as clearVariantsReady, subscribe as subscribeVariants, getSnapshot as getVariantsSnapshot } from "@/lib/variantsTracker";
+import {
+  subscribe as subscribeGenerateMore,
+  getSnapshot as getGenerateMoreSnapshot,
+  isGenerateMoreRunning,
+  getGenerateMorePhase,
+  getGenerateMoreError,
+} from "@/lib/generateMoreTracker";
 import StoryCard from "./StoryCard";
 import ComplianceBadge from "./ComplianceBadge";
 import StoryEditor from "./StoryEditor";
 import ExportDialog from "./ExportDialog";
+import GenerateMoreDialog from "./GenerateMoreDialog";
+import { todayRome } from "@/lib/date";
 
 
 interface Props {
@@ -67,6 +76,8 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
   const [marco, setMarco] = useState<MarcoStoryMap>(initialMarco);
   const [editing, setEditing] = useState<Story | null>(null);
   const [showExport, setShowExport] = useState(false);
+  const [showGenerateMore, setShowGenerateMore] = useState(false);
+  const isToday = date === todayRome();
   const [toast, setToast] = useState<string>("");
 
   useEffect(() => {
@@ -87,6 +98,22 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
   useSyncExternalStore(subscribeChatTracker, getChatTrackerSnapshot);
   // Re-render when variant generation state changes
   useSyncExternalStore(subscribeVariants, getVariantsSnapshot);
+  // Re-render when generate-more state changes
+  useSyncExternalStore(subscribeGenerateMore, getGenerateMoreSnapshot);
+
+  const generateMoreRunning = isGenerateMoreRunning(date);
+  const generateMorePhase = getGenerateMorePhase(date);
+  const generateMoreError = getGenerateMoreError(date);
+  const wasRunningRef = useRef(generateMoreRunning);
+
+  // Toast on successful generate-more completion (modal auto-closes on success,
+  // so this fires whether the user was watching the dialog or not).
+  useEffect(() => {
+    if (wasRunningRef.current && !generateMoreRunning && !generateMoreError) {
+      setToast("New stories added");
+    }
+    wasRunningRef.current = generateMoreRunning;
+  }, [generateMoreRunning, generateMoreError]);
 
   // Check if stories are stale (Marco updated after Sofia)
   const checkStale = useCallback(async () => {
@@ -226,6 +253,49 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
     setStories((prev) => prev.map((s) => s.index === updated.index ? updated : s));
   }
 
+  const generateMoreTile = generateMoreRunning ? (
+    <button
+      type="button"
+      onClick={() => setShowGenerateMore(true)}
+      className="aspect-[9/16] w-full rounded-2xl border-2 border-dashed border-border-mid bg-transparent flex flex-col items-center justify-center gap-5 px-6 text-brand-white cursor-pointer"
+    >
+      <svg className="animate-spin h-10 w-10 text-brand-white opacity-70" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" fill="none" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+      </svg>
+      <div className="flex flex-col items-center gap-1.5">
+        <span className="text-sm font-semibold tracking-[0.06em]">
+          {generateMorePhase === "marco" ? "MARCO RESEARCHING" : "SOFIA WRITING"}
+        </span>
+        <span className="text-[0.7rem] tracking-wide opacity-60 text-center leading-snug">Click to view progress</span>
+      </div>
+    </button>
+  ) : generateMoreError ? (
+    <button
+      type="button"
+      onClick={() => setShowGenerateMore(true)}
+      className="group/add aspect-[9/16] w-full rounded-2xl border-2 border-dashed border-danger/40 bg-danger/5 flex flex-col items-center justify-center gap-5 px-6 text-danger hover:bg-danger/10 transition-colors duration-150 cursor-pointer"
+    >
+      <span className="text-6xl font-extralight leading-none">!</span>
+      <div className="flex flex-col items-center gap-1.5">
+        <span className="text-sm font-semibold tracking-[0.06em]">GENERATION FAILED</span>
+        <span className="text-[0.7rem] tracking-wide opacity-70 text-center leading-snug">Click to retry</span>
+      </div>
+    </button>
+  ) : (
+    <button
+      type="button"
+      onClick={() => setShowGenerateMore(true)}
+      className="group/add aspect-[9/16] w-full rounded-2xl border-2 border-dashed border-border-mid bg-transparent flex flex-col items-center justify-center gap-5 px-6 text-muted hover:border-brand-white hover:text-brand-white transition-colors duration-150 cursor-pointer"
+    >
+      <span className="text-6xl font-extralight leading-none">+</span>
+      <div className="flex flex-col items-center gap-1.5">
+        <span className="text-sm font-semibold tracking-[0.06em]">GENERATE MORE</span>
+        <span className="text-[0.7rem] tracking-wide opacity-70 text-center leading-snug">Ask Sofia for another batch of stories</span>
+      </div>
+    </button>
+  );
+
   if (stories.length === 0) {
     return (
       <>
@@ -247,11 +317,20 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
               {regenerating ? "Generating" : "Generate"}
             </button>
           </div>
+        ) : isToday ? (
+          <div className="mt-4 max-w-[300px]">
+            {generateMoreTile}
+          </div>
+        ) : date > todayRome() ? (
+          <div className="text-left text-brand-white opacity-40 py-12">
+            No stories yet — Sofia hasn't figured out how to predict the future.
+          </div>
         ) : (
           <div className="text-left text-brand-white opacity-40 py-12">
-            No stories for this date — run Sofia to generate.
+            No stories for this date — Sofia must&apos;ve taken the day off.
           </div>
         )}
+        {showGenerateMore && <GenerateMoreDialog date={date} onClose={() => setShowGenerateMore(false)} />}
       </>
     );
   }
@@ -572,16 +651,20 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
             </div>
           );
         })}
+
+        {isToday && generateMoreTile}
       </div>
 
       <div className="mt-10 flex justify-center">
         <button
           onClick={() => setShowExport(true)}
-          className="px-6 py-3 rounded-lg border border-border-mid bg-transparent text-brand-white text-xs font-semibold tracking-[0.06em] cursor-pointer hover:bg-border transition-colors duration-150"
+          className="px-6 py-3 rounded-lg border border-brand-white bg-brand-white text-brand-black text-xs font-semibold tracking-[0.06em] cursor-pointer hover:bg-brand-white/90 transition-colors duration-150"
         >
           {approvedStories.length > 0 ? `EXPORT (${approvedStories.length} approved)` : "EXPORT"}
         </button>
       </div>
+
+      {showGenerateMore && <GenerateMoreDialog date={date} onClose={() => setShowGenerateMore(false)} />}
 
       {showExport && (
         <ExportDialog

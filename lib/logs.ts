@@ -17,6 +17,7 @@ export type LogKind =
   | "story.reject"
   | "story.edit"
   | "variants.generate"
+  | "story.generate-more"
   | "export"
   | "auth.login.success"
   | "auth.login.failure";

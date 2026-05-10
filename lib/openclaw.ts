@@ -157,7 +157,7 @@ function runAgent(agent: AgentId, sessionId: string, message: string): Promise<s
         "--json",
         "--timeout", "120",
       ],
-      { timeout: 130_000 },
+      { timeout: 130_000, maxBuffer: 8 * 1024 * 1024 },
       (err, stdout, stderr) => {
         if (err) return reject(new Error(stderr || err.message));
         try {
@@ -171,7 +171,8 @@ function runAgent(agent: AgentId, sessionId: string, message: string): Promise<s
             .join("\n") ?? "";
           resolve(text);
         } catch {
-          reject(new Error("Failed to parse agent response"));
+          const snippet = stdout?.slice(0, 200).replace(/\s+/g, " ").trim() || "(empty)";
+          reject(new Error(`Failed to parse agent response — stdout: ${snippet}`));
         }
       },
     );
