@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFile, writeFile } from "fs/promises";
+import { writeFile } from "fs/promises";
 import { replaceStory } from "@/lib/serializeStories";
-import { parseStories } from "@/lib/parseStories";
-import { fileExists } from "@/lib/fs";
 import { Story } from "@/types";
 import { requireEnv } from "@/lib/env";
 import { requireFetch, validateStoryParams } from "@/lib/apiGuard";
 import { appendLog } from "@/lib/logs";
 import { diffFields } from "@/lib/storyUtils";
+import { loadStoriesFile } from "@/lib/storyRead";
 
 const SOURCES = new Set(["manual", "sofia", "variant"]);
 
@@ -22,9 +21,8 @@ export async function POST(
   const invalid = validateStoryParams(date, index);
   if (invalid) return invalid;
 
-  const filePath = `${requireEnv("STORIES_PATH")}/${date}.md`;
-
-  if (!(await fileExists(filePath))) {
+  const loaded = await loadStoriesFile(date);
+  if (!loaded) {
     return NextResponse.json({ error: "File not found" }, { status: 404 });
   }
 
@@ -33,12 +31,12 @@ export async function POST(
 
   const updates: Partial<Story> = await req.json();
   const idxNum = parseInt(index, 10);
-  const markdown = await readFile(filePath, "utf-8");
 
-  const before = parseStories(markdown).find((s) => s.index === idxNum);
+  const before = loaded.stories.find((s) => s.index === idxNum);
   const after = { ...updates, index: idxNum } as Story;
-  const updated = replaceStory(markdown, after);
+  const updated = replaceStory(loaded.markdown, after);
 
+  const filePath = `${requireEnv("STORIES_PATH")}/${date}.md`;
   await writeFile(filePath, updated, "utf-8");
 
   const changedFields = before ? diffFields(before, after) : [];

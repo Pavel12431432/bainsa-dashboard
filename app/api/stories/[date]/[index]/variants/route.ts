@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFile } from "fs/promises";
-import { parseStories } from "@/lib/parseStories";
-import { fileExists } from "@/lib/fs";
-import { requireEnv } from "@/lib/env";
 import { requireFetch, validateStoryParams } from "@/lib/apiGuard";
 import { chatWithAgent, buildVariantsMessage, parseVariantsResponse } from "@/lib/openclaw";
 import { readVariants, addVariants } from "@/lib/variants";
 import { appendLog } from "@/lib/logs";
+import { loadStoriesFile } from "@/lib/storyRead";
 
 const BATCH_SIZE = 3;
 
@@ -33,14 +30,12 @@ export async function POST(
   if (invalid) return invalid;
 
   const idxNum = parseInt(index, 10);
-  const filePath = `${requireEnv("STORIES_PATH")}/${date}.md`;
-  if (!(await fileExists(filePath))) {
+  const loaded = await loadStoriesFile(date);
+  if (!loaded) {
     return NextResponse.json({ error: "File not found" }, { status: 404 });
   }
 
-  const markdown = await readFile(filePath, "utf-8");
-  const stories = parseStories(markdown);
-  const story = stories.find((s) => s.index === idxNum);
+  const story = loaded.stories.find((s) => s.index === idxNum);
   if (!story) {
     return NextResponse.json({ error: "Story not found" }, { status: 404 });
   }
