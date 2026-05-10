@@ -1,6 +1,6 @@
 # BAINSA Dashboard — Codebase Reference
 
-Read this file instead of exploring the codebase. It is complete and up-to-date as of 2026-05-02.
+Read this file instead of exploring the codebase. It is complete and up-to-date as of 2026-05-10.
 
 ## Demo mode (for teammates / local dev)
 
@@ -218,6 +218,37 @@ On success, ExportDialog calls `onSuccess(message)` on the parent (StoryGrid) wh
 
 **Why self-host through the tunnel?** We tried several intermediaries before this. ImgBB returns 403 to Meta's crawler IPs. Catbox went down with "uploads paused". Cloudflare R2's S3 endpoint refused TLS handshakes from this network. Cloudflare Workers on `*.workers.dev` and R2 buckets on `*.r2.dev` are blocked for Meta scrapers at the platform level (and adding a custom domain on a Worker still got 9004 from `/media` even when the FB debugger scraped fine — IG's fetcher seems pickier than the debugger). Self-hosting via the existing Cloudflare tunnel at `dashboard.pavelj.com` works because it's a normal origin and Meta is allowlisted as a verified bot there.
 
+## Approval staleness
+
+Goal: the dashboard's "approve before publish" guarantee must survive edits. If you approve a story and then anything edits it (manual save, Sofia inline-chat auto-save, variant apply), the approval no longer reflects what would be exported — and we need to surface that, not silently publish the new content.
+
+**Mechanism**:
+- On approve, the route reads the current story and writes a SHA-256 of its `COMPARABLE_KEYS` to `approvedHash[index]` in the approval sidecar (`lib/storyHash.ts:hashStory`).
+- On read, `deriveStale(stories, approved, approvedHash)` compares each approved story's current hash to the recorded one. Mismatch → stale. Missing recorded hash → not stale (graceful migration for pre-feature approvals; the next approve action populates the hash).
+- The GET `/api/stories/[date]` route and the `app/stories/[date]/page.tsx` server component both compute and ship a `stale: number[]` to the client.
+- `setApproval` deletes `approvedHash[index]` on `reject`/`clear`, writes it on `approve`. Empty `approvedHash` object is removed before write, same as `feedback`.
+
+**Hash hygiene**: `hashStory` builds the picked object via a `for…of COMPARABLE_KEYS` loop because `JSON.stringify` preserves insertion order. Switching to `Object.fromEntries` or sorting keys would silently invalidate every stored hash. There's an explicit comment in `lib/storyHash.ts` — heed it.
+
+**UI states** (StoryGrid card):
+- Fresh: no glow, button row is `EDIT / APPROVE / REJECT`.
+- Approved: green glow, `EDIT / ✓ / REJECT` (click ✓ to clear).
+- **Stale-approved (third state)**: amber glow + small `EDITED` chip top-left. Button row is `EDIT / RE-APPROVE / REJECT`. The EDITED chip has a small `✕` that clears the approval entirely (different from RE-APPROVE which re-blesses current content).
+- Rejected: red glow + dark overlay, `EDIT / APPROVE / ✕`.
+
+The X-on-pill semantics is "discard the broken approval", not "dismiss the warning". A first-time user might click it expecting the EDITED chip to vanish while approval stays — they get the green glow gone instead. Tooltip says "Clear approval"; mitigation is "you find out once". Don't reverse this without thinking through what the alternative meaning of X-on-warning would be.
+
+**Optimistic stale on local save**: `StoryGrid.handleSaved` adds the index to `approvalStale` immediately after a manual editor save, since the API doesn't recompute and ship `stale` in the update response. The `stories-changed` event triggers a `refreshStories()` shortly after, which overwrites with server-derived state. Edge case: a no-op edit (save without changes) flags briefly stale until the next refresh. Acceptable.
+
+**Client-side derivation deliberately avoided**: the client doesn't have access to Node `crypto`, so all hashing happens server-side. The trade-off is one round-trip after edits to learn the new staleness state — fine because we already make that round-trip for stories.
+
+**ExportDialog behavior**:
+- Stale rows show an amber `EDITED` pill alongside any `POSTED` pill.
+- Initial selection and the "Approved only" quick filter both **exclude** stale indexes — you can't accidentally publish a stale-approved story via either default path.
+- Manually selecting a stale row is allowed. The IG confirm overlay surfaces a `RE-APPROVE BEFORE POSTING` callout listing the affected stories, but the POST button is **not** disabled — same warn-not-block pattern as `ALREADY POSTED`. Treat the operator as competent.
+- Download (PNG/ZIP) is unaffected by staleness; download is a local action, not a publish guarantee.
+- The two callouts (stale + already-posted) share a local `WarningCallout` component in `ExportDialog.tsx` — same shape, same styling. If you add a third warning kind, extend it or split the component.
+
 ## Audit logging
 
 Append-only JSONL files at `${LOGS_PATH}/YYYY-MM-DD.jsonl` (one file per day, defaults to `./logs`, gitignored). Surfaced read-only at `/logs` (linked from the hamburger menu) with kind/actor/status/text-search filters and a load-more cursor.
@@ -242,7 +273,7 @@ Logged kinds: `agent.call` (every Marco/Sofia/Lorenzo call, with duration + prom
 2. **Sofia** reads Marco's handoff + brand guidelines, writes `YYYY-MM-DD.md` to `STORIES_PATH` (daily at 12:30)
 3. Dashboard reads these files, parses stories, renders as 9:16 cards
 4. Edits write back to the same `.md` file via `replaceStory()` in `serializeStories.ts`
-5. Approvals stored in `YYYY-MM-DD.approved.json` sidecar next to stories (includes optional `feedback` map: story index -> rejection reason)
+5. Approvals stored in `YYYY-MM-DD.approved.json` sidecar next to stories. Optional fields: `feedback` (story index -> rejection reason) and `approvedHash` (story index -> sha256 of comparable fields at approval time, used to detect "stale-approved" stories — see Approval staleness)
 6. Version history stored in `YYYY-MM-DD.history.json` sidecar next to stories
 7. Successful Instagram posts append to `YYYY-MM-DD.posted.json` sidecar (per-index history of `{ postedAt, mediaId, containerId? }`)
 8. Human triggers Lorenzo from Teach page -> pending proposal stored in `ADAPTIVE.proposal.json` in `SOFIA_INSTRUCTIONS_PATH` -> on accept, proposal content replaces ADAPTIVE.md and previous version goes to `ADAPTIVE.history.json` tagged `source: "editor-agent"`
@@ -305,6 +336,13 @@ interface Story {
   ghostAccent: GhostAccent;
 }
 
+interface ApprovalState {
+  approved: number[];                       // 1-based story indices
+  rejected: number[];
+  feedback?: Record<number, string>;        // story index -> rejection reason
+  approvedHash?: Record<number, string>;    // sha256 of comparable fields at approval time
+}
+
 interface ComplianceCheck {
   pass: boolean;
   detail: string;          // human-readable explanation when failing
@@ -353,9 +391,9 @@ interface ChatMessage {
 
 | File | Purpose |
 |---|---|
-| `api/stories/[date]/route.ts` | `GET` — returns `{ stories, approvals, posted }` JSON |
-| `api/stories/[date]/[index]/update/route.ts` | `POST` — updates story in markdown file via `replaceStory()` |
-| `api/stories/[date]/[index]/approve/route.ts` | `POST` — sets approval state |
+| `api/stories/[date]/route.ts` | `GET` — returns `{ stories, approvals, posted, marco, stale }` JSON. `stale` is the list of approved indexes whose current hash no longer matches the recorded `approvedHash` (see Approval staleness). |
+| `api/stories/[date]/[index]/update/route.ts` | `POST` — updates story in markdown file via `replaceStory()`. Does not touch the approval sidecar; the approval becomes stale on next read because its recorded hash no longer matches. |
+| `api/stories/[date]/[index]/approve/route.ts` | `POST { action, feedback? }` — sets approval state. On `approve`, reads the current story from STORIES_PATH and threads it to `setApproval` so the SHA-256 of comparable fields is recorded in `approvedHash[index]`. On `reject`/`clear`, deletes the recorded hash. |
 | `api/stories/[date]/[index]/chat/route.ts` | `POST` — proxies chat to Sofia via `chatWithAgent("sofia", ...)` |
 | `api/stories/[date]/[index]/history/route.ts` | `GET/POST` — version history entries |
 | `api/stories/[date]/[index]/variants/route.ts` | `GET` — read variants for a story. `POST` — generate 3 new variants via Sofia |
@@ -384,7 +422,7 @@ interface ChatMessage {
 | `SlidePanel.tsx` | Shared slide-out panel: `side` (left/right), `width`, `title` (ReactNode), `onClose`. 220ms translateX animation. |
 | `HamburgerMenu.tsx` | Left slide-out: "Today's Stories" link, search bar (debounced, results as links with `?highlight`), agent output triggers (mobile only, stories page only via `hasDate` prop), "Teach Sofia" link, logout. |
 | `AgentChat.tsx` | Right slide-out chat with Marco/Sofia. Agent tabs for switching. Collapsible+draggable output block, then uses `<ChatMessages>` for the message list + input. Reads loading state directly from `agentChatTracker` keyed by `(date, agent)` so the thinking indicator survives drawer close AND date navigation. Calls `markLoading`/`clearLoading` around `send()`. On completion, if `isActiveView(date, agent)` is false (user left the drawer or switched agent/date), calls `markUnread` so the header button shows a dot. `useEffect` calls `setActiveView({date, agent})` while open. Captures `agent`, `sessionId`, and `date` in `send()` closure so requests complete cleanly even if the component unmounts. Prepends `[Viewing stories for DATE]` to messages. |
-| `StoryGrid.tsx` | 4-col grid (responsive). Approve/reject/edit buttons per card — hover overlay on desktop, separate row below card on mobile. Reject flow: clicking REJECT shows inline feedback textarea with SKIP/SUBMIT buttons; feedback stored in approval sidecar. Rejected cards show feedback preview below. Approved cards get green outer glow, rejected get red glow + dark overlay. Compliance badges on failing cards with hover tooltips (card column gets `z-10` on badge hover to prevent clipping). Stale stories banner when Marco ran after Sofia — Regenerate button sends a reconcile prompt to Sofia (keep unchanged stories as-is, only update/add items that differ in Marco's handoff). Regenerate uses `regenerateTracker`, so the spinner survives date navigation. On completion, the tracker's `changed` flag is set; a mount-time effect in StoryGrid checks the flag and re-fetches via `/api/stories/${date}` (bypassing the Next.js Router Cache) so returning to the date after regen shows fresh stories. Export button at bottom (shows approved count if any). Listens for `stories-changed` CustomEvent to refetch. Uses `useSyncExternalStore` with `storyChatTracker` for Sofia loading spinner and "Sofia updated" pill on cards. Updates `editing` state when stories refresh so the open editor receives background changes. Uses `storiesRef` for stable `refreshStories` callback identity. Division filter pills. Renders the `+ GENERATE MORE` tile (today only) as the trailing grid cell, or the sole tile when today has no stories yet — toasts on success, mirrors `generateMoreTracker` state for spinner/error variants. |
+| `StoryGrid.tsx` | 4-col grid (responsive). Approve/reject/edit buttons per card — hover overlay on desktop, separate row below card on mobile. Reject flow: clicking REJECT shows inline feedback textarea with SKIP/SUBMIT buttons; feedback stored in approval sidecar. Rejected cards show feedback preview below. Approved cards get green outer glow, rejected get red glow + dark overlay. **Stale-approved (third state)**: amber glow + EDITED chip top-left with a small `✕` that clears the approval entirely; APPROVE button reverts to `RE-APPROVE` text — clicking it re-blesses current content. Per-card approval state derivation (`approveActive`/`approveLabel`/`approveAction`) is computed once and reused by desktop+mobile button blocks to keep the two in sync. `approvalStale` mirrors the server-derived `data.stale`; `handleSaved` optimistically adds the saved index to it after a manual editor save (server reconciles on next fetch). Compliance badges on failing cards with hover tooltips (card column gets `z-10` on badge hover to prevent clipping). Stale stories banner when Marco ran after Sofia — Regenerate button sends a reconcile prompt to Sofia (keep unchanged stories as-is, only update/add items that differ in Marco's handoff). Regenerate uses `regenerateTracker`, so the spinner survives date navigation. On completion, the tracker's `changed` flag is set; a mount-time effect in StoryGrid checks the flag and re-fetches via `/api/stories/${date}` (bypassing the Next.js Router Cache) so returning to the date after regen shows fresh stories. Export button at bottom (shows approved count if any). Listens for `stories-changed` CustomEvent to refetch. Uses `useSyncExternalStore` with `storyChatTracker` for Sofia loading spinner and "Sofia updated" pill on cards. Updates `editing` state when stories refresh so the open editor receives background changes. Uses `storiesRef` for stable `refreshStories` callback identity. Division filter pills. Renders the `+ GENERATE MORE` tile (today only) as the trailing grid cell, or the sole tile when today has no stories yet — toasts on success, mirrors `generateMoreTracker` state for spinner/error variants. |
 | `GenerateMoreDialog.tsx` | Modal opened from the `+ GENERATE MORE` tile. Count picker (1/3/5) + optional 300-char focus textarea, prefs persisted to localStorage under `GENERATE_MORE_PREFS_KEY`. Calls `runGenerateMore` on the tracker (which owns the fetch). Closing mid-flight is fine — generation continues in the background. Auto-closes on success; on failure stays open with a dismissible error so the user can tweak and retry. Today-only feature (the tile is hidden on other dates). |
 | `StoryCard.tsx` | Card shell: fixed scale (editor) or auto-scale via `useLayoutEffect` + `ResizeObserver` (grid). |
 | `StoryContent.tsx` | Inner 9:16 story design: accent border, BAINSA logo, chevron/plus accent (via `<TintedAccent>` — see html2canvas-pro gotcha), headline (Alliance No.2), body, source. |
@@ -402,7 +440,7 @@ interface ChatMessage {
 | `FeedbackInspector.tsx` | Modal opened from TeachEditor. Shows 7/14/30/None window selector (None = days:0, skip feedback entirely), summary pills (approvals/rejections/edits/variants), tabbed signal list (rejections/edits/variants/approvals) with expandable rows showing full detail (rejection reason, before/after diffs for edits, etc.). Before generation: optional 500-char `Focus` textarea (Cmd/Ctrl+Enter submits) above the CANCEL / GENERATE PROPOSAL row; focus is one-shot, reset whenever the modal closes. With None selected, focus becomes required and GENERATE stays disabled until it has content; the subtitle/placeholder/footer copy adjust to make this explicit. `onGenerate(days, focus?)` threads it to the API. After generation (review-only mode): accepts `highlightRefs` from ProposalView rationale/conflict clicks to pre-expand and visually highlight matching rows. |
 | `ProposalView.tsx` | Renders a pending Lorenzo proposal: header with time-ago + window + signal counts, optional focus breadcrumb (`FOCUS · "..."`) when `operatorFocus` is set on the proposal — survives refines, refine breadcrumb (`REFINED N×  "nudge1" → "nudge2"` with UNDO button when `previousProposal` is present), amber warnings pills (shrinkage / unchanged-from-previous), amber conflict callout (if any), summary, bulleted rationale with clickable `[rejection-0, edit-2]` citation links (call `onInspect(refs)`) — purely focus-driven bullets carry empty `signalRefs` and render no chip, inline diff vs current ADAPTIVE.md via `<DiffBlock>`, sticky footer with REJECT / REFINE / EDIT FIRST / ACCEPT. REFINE opens an inline textarea (autoscrolled into view, focus restored); submitting calls `onRefine(nudge)`. On any proposal change (generatedAt), the panel auto-scrolls to top so the updated summary is the first thing visible — critical when refine returns near-identical content. Stale amber banner when `basedOnAdaptive !== currentAdaptive`. For `status: "no-changes"`, renders a centered "Lorenzo is leaving things alone" message with only a DISMISS button. |
 | `DiffBlock.tsx` | Shared LCS-diff renderer used by TeachEditor (history diff) and ProposalView (proposal diff). Props: `lines: DiffLine[]`, `inset: "x-3" \| "x-4"` for the pull-out padding, optional `className`. Uses NBSP for empty lines. |
-| `ExportDialog.tsx` | Modal for selecting stories to export as PNG (ZIP or individual) or post directly to Instagram. Custom dark checkboxes. Smart pre-selection: approved stories if any, otherwise all. "Approved only" quick filter. Accepts `posted: PostedMap` and renders a `POSTED` (or `POSTED ×N`) pill on each posted row; the IG confirm overlay shows an amber **ALREADY POSTED** callout listing affected stories (warning only, doesn't block). After each successful post calls `onPosted(index, record)` so the parent grid updates optimistically without re-fetching. Fire-and-forgets a `POST /api/logs` `kind: "export"` entry on download success (IG posts log server-side). Uses html2canvas-pro for rendering + JSZip for bundling. |
+| `ExportDialog.tsx` | Modal for selecting stories to export as PNG (ZIP or individual) or post directly to Instagram. Custom dark checkboxes. Accepts `stale: number[]` and `approvedIndices: number[]`; computes `freshApproved = approvedIndices.filter(i => !stale.includes(i))`. Smart pre-selection and "Approved only" quick filter both use `freshApproved` so stale-approved stories are excluded from the default-publish path. Stale rows show an amber `EDITED` pill alongside the `POSTED` (or `POSTED ×N`) pill. The IG confirm overlay surfaces both `RE-APPROVE BEFORE POSTING` and `ALREADY POSTED` callouts via a shared local `WarningCallout` component (extend or split if a third warning kind is added). Both are warn-not-block — the POST button is never disabled by staleness. After each successful post calls `onPosted(index, record)` so the parent grid updates optimistically without re-fetching. Fire-and-forgets a `POST /api/logs` `kind: "export"` entry on download success (IG posts log server-side). Uses html2canvas-pro for rendering + JSZip for bundling. |
 | `LogsView.tsx` | Client component for the Logs page. Search input + actor / status / kind filter pills, virtualized-light list (slice + LOAD MORE cursor), expand-row to see meta JSON. Re-fetches whenever filters change. Color-coded kind labels via `KIND_COLORS`. |
 
 ### Lib (`lib/`)
@@ -414,7 +452,8 @@ interface ChatMessage {
 | `compliance.ts` | `checkCompliance(story)` -> `ComplianceResult`. Each check returns `{ pass, detail }`. Checks: color matches division canonical, headline 0-80 chars, body 0-max chars (content-type-aware: text=300, bullets=200, quote=200), source non-empty. Exports `bodyMaxChars(contentType)`. |
 | `exportCards.ts` | PNG export: renders `StoryContent` offscreen via `createRoot`, captures with html2canvas-pro at 4x scale, downloads individually or as ZIP. Calls `preloadTintedAccents()` before the capture loop. |
 | `tintedAccent.ts` | Tints accent PNGs by recoloring opaque pixels through an offscreen canvas (`source-in` composite), caches data URLs by `src\|color`. Workaround for html2canvas-pro's lack of mask/filter support. Exports `tintedDataUrl`, `getTintedDataUrlSync`, `preloadTintedAccents`. |
-| `approvals.ts` | Read/write approval JSON sidecars. |
+| `approvals.ts` | Read/write approval JSON sidecars. `setApproval(date, index, action, options)` takes `{feedback?, story?}`; on `approve` with `story` provided, records `approvedHash[index]` via `hashStory`. Empty `approvedHash` object is dropped on write, same as `feedback`. |
+| `storyHash.ts` | Approval-staleness primitives. `hashStory(story)` SHA-256s the JSON of `COMPARABLE_KEYS`-picked fields (insertion-order dependent — see code comment, don't switch to `Object.fromEntries`). `deriveStale(stories, approved, approvedHash)` returns indexes whose current hash differs from the recorded one. Missing hash = not stale (graceful for pre-feature approvals). |
 | `posted.ts` | Read/append `{date}.posted.json` sidecar. `readPosted(date) -> PostedMap`, `addPostRecord(date, index, record)` appends to per-index history (does not deduplicate — reposts intentionally accumulate). |
 | `marcoHandoff.ts` | Parses Marco's daily handoff markdown into `Record<index, { url, sourceLabel, reason }>` keyed by Story N. `readMarcoStories(date)` returns `{}` on missing/malformed file. Surfaces source URL + BAINSA angle on grid cards (hover chip top-right) and in the StoryEditor (footnote below fields). Index-based matching to Sofia's stories — no fuzzy fallback. |
 | `instagram.ts` | Meta Graph API client. `publishStory(imageUrl)` runs the create-container → poll → publish chain. `getAccountUsername()` looks up the username for the current `IG_ACCESS_TOKEN`, cached in a module-level variable keyed by the token string (so a token swap invalidates the cache without a server restart). Internal `metaCall<T>()` wraps fetch with rich error parsing — full Meta error JSON is logged to stdout, `error_user_msg` extracted into the thrown message. |
