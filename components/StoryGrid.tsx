@@ -256,9 +256,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
 
   function handleSaved(updated: Story) {
     setStories((prev) => prev.map((s) => s.index === updated.index ? updated : s));
-    // Optimistically stale the approval — the server will reconcile on next fetch.
-    // Edge case: if the edit happened to produce the exact same hash (e.g. revert),
-    // this flags it stale until the next refreshStories() corrects it.
+    // Server reconciles on next fetch; a no-op edit briefly mis-flags as stale.
     if (approvals.approved.includes(updated.index)) {
       setApprovalStale((prev) => prev.includes(updated.index) ? prev : [...prev, updated.index]);
     }
@@ -432,6 +430,9 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
           const approved = approvals.approved.includes(story.index);
           const rejected = approvals.rejected.includes(story.index);
           const isStale = approved && approvalStale.includes(story.index);
+          const approveActive = approved && !isStale;
+          const approveLabel = approveActive ? "✓" : isStale ? "RE-APPROVE" : "APPROVE";
+          const approveAction: "approve" | "clear" = approveActive ? "clear" : "approve";
           const chatThinking = isStoryChatLoading(date, story.index);
           const variantsGenerating = isVariantsGenerating(date, story.index);
           const variantsReady = !variantsGenerating && isVariantsReady(date, story.index);
@@ -567,14 +568,14 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
                         EDIT
                       </button>
                       <button
-                        onClick={() => handleApprove(story.index, approved && !isStale ? "clear" : "approve")}
+                        onClick={() => handleApprove(story.index, approveAction)}
                         className={`${actionBtn} border backdrop-blur-sm ${
-                          approved && !isStale
+                          approveActive
                             ? "border-success bg-success/20 text-success"
                             : "border-border-mid bg-brand-black/80 text-brand-white"
                         }`}
                       >
-                        {approved && !isStale ? "✓" : isStale ? "RE-APPROVE" : "APPROVE"}
+                        {approveLabel}
                       </button>
                       <button
                         onClick={() => rejected ? handleApprove(story.index, "clear") : startReject(story.index)}
@@ -629,14 +630,14 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
                       EDIT
                     </button>
                     <button
-                      onClick={() => handleApprove(story.index, approved && !isStale ? "clear" : "approve")}
+                      onClick={() => handleApprove(story.index, approveAction)}
                       className={`${actionBtn} border ${
-                        approved && !isStale
+                        approveActive
                           ? "border-success bg-success/20 text-success"
                           : "border-border-mid bg-brand-black text-brand-white"
                       }`}
                     >
-                      {approved && !isStale ? "✓" : isStale ? "RE-APPROVE" : "APPROVE"}
+                      {approveLabel}
                     </button>
                     <button
                       onClick={() => rejected ? handleApprove(story.index, "clear") : startReject(story.index)}

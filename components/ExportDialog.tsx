@@ -39,6 +39,30 @@ function loadPrefs(): Prefs {
   }
 }
 
+function WarningCallout({ title, items, singular, plural }: {
+  title: string;
+  items: Story[];
+  singular: string;
+  plural: (n: number) => string;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div className="mt-4 p-3 rounded-md border border-amber-500/40 bg-amber-500/10">
+      <p className="text-[0.7rem] font-semibold text-amber-400 m-0 mb-1.5 tracking-[0.04em]">{title}</p>
+      <p className="text-[0.7rem] text-amber-200/80 leading-snug m-0 mb-1.5">
+        {items.length === 1 ? singular : plural(items.length)}
+      </p>
+      <ul className="m-0 pl-4 text-[0.7rem] text-amber-200/70 leading-snug list-disc">
+        {items.map((s) => (
+          <li key={s.index}>
+            <span className="opacity-80">#{s.index}</span> {s.headline}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function ExportDialog({ stories, approvedIndices = [], stale = [], posted = {}, date, onClose, onSuccess, onPosted }: Props) {
   const hasPosted = (index: number) => (posted[index]?.length ?? 0) > 0;
   const isStale = (index: number) => stale.includes(index);
@@ -393,52 +417,18 @@ export default function ExportDialog({ stories, approvedIndices = [], stale = []
                   <span className="opacity-80">your linked account</span>
                 )}.
               </p>
-              {(() => {
-                const stales = stories.filter((s) => selected.has(s.index) && isStale(s.index));
-                if (stales.length === 0) return null;
-                return (
-                  <div className="mt-4 p-3 rounded-md border border-amber-500/40 bg-amber-500/10">
-                    <p className="text-[0.7rem] font-semibold text-amber-400 m-0 mb-1.5 tracking-[0.04em]">
-                      RE-APPROVE BEFORE POSTING
-                    </p>
-                    <p className="text-[0.7rem] text-amber-200/80 leading-snug m-0 mb-1.5">
-                      {stales.length === 1
-                        ? "This story changed after it was approved. Re-approve it before posting."
-                        : `${stales.length} of these stories changed after they were approved. Re-approve them before posting.`}
-                    </p>
-                    <ul className="m-0 pl-4 text-[0.7rem] text-amber-200/70 leading-snug list-disc">
-                      {stales.map((s) => (
-                        <li key={s.index}>
-                          <span className="opacity-80">#{s.index}</span> {s.headline}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                );
-              })()}
-              {(() => {
-                const dupes = stories.filter((s) => selected.has(s.index) && hasPosted(s.index));
-                if (dupes.length === 0) return null;
-                return (
-                  <div className="mt-4 p-3 rounded-md border border-amber-500/30 bg-amber-500/10">
-                    <p className="text-[0.7rem] font-semibold text-amber-400 m-0 mb-1.5 tracking-[0.04em]">
-                      ALREADY POSTED
-                    </p>
-                    <p className="text-[0.7rem] text-amber-200/80 leading-snug m-0 mb-1.5">
-                      {dupes.length === 1
-                        ? "This story has already been posted to Instagram. Continue to post it again?"
-                        : `${dupes.length} of these stories have already been posted. Continue to post them again?`}
-                    </p>
-                    <ul className="m-0 pl-4 text-[0.7rem] text-amber-200/70 leading-snug list-disc">
-                      {dupes.map((s) => (
-                        <li key={s.index}>
-                          <span className="opacity-80">#{s.index}</span> {s.headline}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                );
-              })()}
+              <WarningCallout
+                title="RE-APPROVE BEFORE POSTING"
+                items={stories.filter((s) => selected.has(s.index) && isStale(s.index))}
+                singular="This story changed after it was approved. Re-approve it before posting."
+                plural={(n) => `${n} of these stories changed after they were approved. Re-approve them before posting.`}
+              />
+              <WarningCallout
+                title="ALREADY POSTED"
+                items={stories.filter((s) => selected.has(s.index) && hasPosted(s.index))}
+                singular="This story has already been posted to Instagram. Continue to post it again?"
+                plural={(n) => `${n} of these stories have already been posted. Continue to post them again?`}
+              />
             </div>
             <div className="flex gap-2 px-6 pb-5">
               <button
