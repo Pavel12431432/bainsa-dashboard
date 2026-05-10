@@ -37,6 +37,10 @@ yarn-error.log*
 # local editor/agent config
 .mcp.json
 
+# local notes / review artifacts (not for git)
+/notes/
+repomix-output*.xml
+
 # sample data runtime mutations (teammates running locally)
 /samples/stories/*.approved.json
 /samples/stories/*.history.json
