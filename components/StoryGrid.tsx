@@ -490,8 +490,15 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
                   </div>
                 )}
                 {isStale && !chatThinking && !variantsGenerating && !chatUpdated && !variantsReady && (
-                  <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-amber-500/15 border border-amber-500/40 backdrop-blur-sm z-10">
+                  <div className="absolute top-3 left-3 flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-md bg-amber-500/15 border border-amber-500/40 backdrop-blur-sm z-10">
                     <span className="text-[0.6rem] font-semibold tracking-[0.06em] text-amber-400">EDITED</span>
+                    <button
+                      onClick={() => handleApprove(story.index, "clear")}
+                      title="Clear approval"
+                      className="ml-1 w-4 h-4 flex items-center justify-center rounded-sm bg-transparent border-none text-amber-400 opacity-70 hover:opacity-100 hover:bg-amber-500/20 cursor-pointer text-[0.7rem] leading-none"
+                    >
+                      ✕
+                    </button>
                   </div>
                 )}
                 {!compliance.pass && (
@@ -567,7 +574,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
                             : "border-border-mid bg-brand-black/80 text-brand-white"
                         }`}
                       >
-                        {approved && !isStale ? "✓" : "APPROVE"}
+                        {approved && !isStale ? "✓" : isStale ? "RE-APPROVE" : "APPROVE"}
                       </button>
                       <button
                         onClick={() => rejected ? handleApprove(story.index, "clear") : startReject(story.index)}
@@ -629,7 +636,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
                           : "border-border-mid bg-brand-black text-brand-white"
                       }`}
                     >
-                      {approved && !isStale ? "✓" : "APPROVE"}
+                      {approved && !isStale ? "✓" : isStale ? "RE-APPROVE" : "APPROVE"}
                     </button>
                     <button
                       onClick={() => rejected ? handleApprove(story.index, "clear") : startReject(story.index)}

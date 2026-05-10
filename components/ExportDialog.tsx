@@ -450,8 +450,7 @@ export default function ExportDialog({ stories, approvedIndices = [], stale = []
               <button
                 onClick={handleInstagram}
                 autoFocus
-                disabled={stories.some((s) => selected.has(s.index) && isStale(s.index))}
-                className="flex-1 py-2.5 rounded-lg bg-brand-white text-brand-black text-xs font-semibold tracking-[0.04em] border-none cursor-pointer hover:opacity-90 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed"
+                className="flex-1 py-2.5 rounded-lg bg-brand-white text-brand-black text-xs font-semibold tracking-[0.04em] border-none cursor-pointer hover:opacity-90 transition-opacity"
               >
                 POST
               </button>
