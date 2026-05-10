@@ -9,6 +9,7 @@ import { useOverlayClose } from "@/lib/useOverlayClose";
 interface Props {
   stories: Story[];
   approvedIndices?: number[];
+  stale?: number[];
   posted?: PostedMap;
   date: string;
   onClose: () => void;
@@ -38,10 +39,12 @@ function loadPrefs(): Prefs {
   }
 }
 
-export default function ExportDialog({ stories, approvedIndices = [], posted = {}, date, onClose, onSuccess, onPosted }: Props) {
+export default function ExportDialog({ stories, approvedIndices = [], stale = [], posted = {}, date, onClose, onSuccess, onPosted }: Props) {
   const hasPosted = (index: number) => (posted[index]?.length ?? 0) > 0;
+  const isStale = (index: number) => stale.includes(index);
+  const freshApproved = approvedIndices.filter((i) => !isStale(i));
   const [selected, setSelected] = useState<Set<number>>(() => {
-    if (approvedIndices.length > 0) return new Set(approvedIndices);
+    if (freshApproved.length > 0) return new Set(freshApproved);
     return new Set(stories.map((s) => s.index));
   });
   const [destination, setDestination] = useState<Destination>(() => loadPrefs().destination);
@@ -234,6 +237,14 @@ export default function ExportDialog({ stories, approvedIndices = [], posted = {
               <span className="flex-1 text-[0.8rem] text-brand-white opacity-60 group-hover:opacity-90 transition-opacity leading-tight">
                 {story.index}. {story.headline}
               </span>
+              {isStale(story.index) && (
+                <span
+                  className="text-[0.55rem] font-semibold tracking-[0.06em] px-1.5 py-0.5 rounded border border-amber-500/40 text-amber-400 shrink-0"
+                  title="Approved version differs from current — re-approve to clear"
+                >
+                  EDITED
+                </span>
+              )}
               {hasPosted(story.index) && (
                 <span
                   className="text-[0.55rem] font-semibold tracking-[0.06em] px-1.5 py-0.5 rounded border border-amber-500/40 text-amber-400 shrink-0"
@@ -257,9 +268,9 @@ export default function ExportDialog({ stories, approvedIndices = [], posted = {
           <button onClick={deselectAll} className="bg-transparent border-none text-[0.65rem] text-brand-white opacity-35 hover:opacity-60 cursor-pointer p-0">
             Clear
           </button>
-          {approvedIndices.length > 0 && (
+          {freshApproved.length > 0 && (
             <button
-              onClick={() => setSelected(new Set(approvedIndices))}
+              onClick={() => setSelected(new Set(freshApproved))}
               className="bg-transparent border-none text-[0.65rem] text-success/70 hover:text-success cursor-pointer p-0"
             >
               Approved only
@@ -383,6 +394,29 @@ export default function ExportDialog({ stories, approvedIndices = [], posted = {
                 )}.
               </p>
               {(() => {
+                const stales = stories.filter((s) => selected.has(s.index) && isStale(s.index));
+                if (stales.length === 0) return null;
+                return (
+                  <div className="mt-4 p-3 rounded-md border border-amber-500/40 bg-amber-500/10">
+                    <p className="text-[0.7rem] font-semibold text-amber-400 m-0 mb-1.5 tracking-[0.04em]">
+                      RE-APPROVE BEFORE POSTING
+                    </p>
+                    <p className="text-[0.7rem] text-amber-200/80 leading-snug m-0 mb-1.5">
+                      {stales.length === 1
+                        ? "This story changed after it was approved. Re-approve it before posting."
+                        : `${stales.length} of these stories changed after they were approved. Re-approve them before posting.`}
+                    </p>
+                    <ul className="m-0 pl-4 text-[0.7rem] text-amber-200/70 leading-snug list-disc">
+                      {stales.map((s) => (
+                        <li key={s.index}>
+                          <span className="opacity-80">#{s.index}</span> {s.headline}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })()}
+              {(() => {
                 const dupes = stories.filter((s) => selected.has(s.index) && hasPosted(s.index));
                 if (dupes.length === 0) return null;
                 return (
@@ -416,7 +450,8 @@ export default function ExportDialog({ stories, approvedIndices = [], posted = {
               <button
                 onClick={handleInstagram}
                 autoFocus
-                className="flex-1 py-2.5 rounded-lg bg-brand-white text-brand-black text-xs font-semibold tracking-[0.04em] border-none cursor-pointer hover:opacity-90 transition-opacity"
+                disabled={stories.some((s) => selected.has(s.index) && isStale(s.index))}
+                className="flex-1 py-2.5 rounded-lg bg-brand-white text-brand-black text-xs font-semibold tracking-[0.04em] border-none cursor-pointer hover:opacity-90 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 POST
               </button>

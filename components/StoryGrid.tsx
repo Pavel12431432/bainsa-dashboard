@@ -690,6 +690,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
         <ExportDialog
           stories={stories}
           approvedIndices={approvals.approved}
+          stale={approvalStale}
           posted={posted}
           date={date}
           onClose={() => setShowExport(false)}
