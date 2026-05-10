@@ -30,6 +30,7 @@ export interface ApprovalState {
   approved: number[];   // 1-based story indices
   rejected: number[];
   feedback?: Record<number, string>;  // story index -> rejection reason
+  approvedHash?: Record<number, string>;  // sha256 of comparable story fields at approval time
 }
 
 export interface ComplianceCheck {

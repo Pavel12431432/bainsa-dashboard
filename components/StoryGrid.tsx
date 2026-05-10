@@ -30,6 +30,7 @@ interface Props {
   initialApprovals: ApprovalState;
   initialPosted?: PostedMap;
   initialMarco?: MarcoStoryMap;
+  initialStale?: number[];
   highlightIndex?: number;
 }
 
@@ -52,7 +53,7 @@ const DIVISION_COLORS: Record<Division, string> = {
   Analysis: "#fe6203",
 };
 
-export default function StoryGrid({ date, initialStories, initialApprovals, initialPosted = {}, initialMarco = {}, highlightIndex }: Props) {
+export default function StoryGrid({ date, initialStories, initialApprovals, initialPosted = {}, initialMarco = {}, initialStale = [], highlightIndex }: Props) {
   const [stories, setStories] = useState<Story[]>(initialStories);
   const storiesRef = useRef(stories);
   storiesRef.current = stories;
@@ -74,6 +75,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
   const [approvals, setApprovals] = useState<ApprovalState>(initialApprovals);
   const [posted, setPosted] = useState<PostedMap>(initialPosted);
   const [marco, setMarco] = useState<MarcoStoryMap>(initialMarco);
+  const [approvalStale, setApprovalStale] = useState<number[]>(initialStale);
   const [editing, setEditing] = useState<Story | null>(null);
   const [showExport, setShowExport] = useState(false);
   const [showGenerateMore, setShowGenerateMore] = useState(false);
@@ -196,6 +198,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
       if (data.approvals) setApprovals(data.approvals);
       if (data.posted) setPosted(data.posted);
       if (data.marco) setMarco(data.marco);
+      if (Array.isArray(data.stale)) setApprovalStale(data.stale);
     } catch {}
   }, [date]);
 
@@ -229,6 +232,8 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
     if (res.ok) {
       const data = await res.json();
       setApprovals(data.approvals);
+      // Any approve/reject/clear action resolves staleness for this index.
+      setApprovalStale((prev) => prev.filter((i) => i !== index));
     }
   }
 
