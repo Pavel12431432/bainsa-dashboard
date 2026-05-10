@@ -256,6 +256,12 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
 
   function handleSaved(updated: Story) {
     setStories((prev) => prev.map((s) => s.index === updated.index ? updated : s));
+    // Optimistically stale the approval — the server will reconcile on next fetch.
+    // Edge case: if the edit happened to produce the exact same hash (e.g. revert),
+    // this flags it stale until the next refreshStories() corrects it.
+    if (approvals.approved.includes(updated.index)) {
+      setApprovalStale((prev) => prev.includes(updated.index) ? prev : [...prev, updated.index]);
+    }
   }
 
   const generateMoreTile = generateMoreRunning ? (
@@ -425,6 +431,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
           const compliance = checkCompliance(story);
           const approved = approvals.approved.includes(story.index);
           const rejected = approvals.rejected.includes(story.index);
+          const isStale = approved && approvalStale.includes(story.index);
           const chatThinking = isStoryChatLoading(date, story.index);
           const variantsGenerating = isVariantsGenerating(date, story.index);
           const variantsReady = !variantsGenerating && isVariantsReady(date, story.index);
@@ -437,8 +444,11 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
               <div className="relative w-full">
                 <StoryCard story={story} />
 
-                {approved && (
+                {approved && !isStale && (
                   <div className="absolute inset-0 rounded-2xl border border-success/30 pointer-events-none" style={{ boxShadow: "0 0 16px rgba(34,197,94,0.4), 0 0 40px rgba(34,197,94,0.15)" }} />
+                )}
+                {isStale && (
+                  <div className="absolute inset-0 rounded-2xl border border-amber-500/40 pointer-events-none" style={{ boxShadow: "0 0 16px rgba(245,158,11,0.4), 0 0 40px rgba(245,158,11,0.15)" }} />
                 )}
                 {(rejected || rejectingIndex === story.index) && (
                   <div className="absolute inset-0 rounded-2xl border border-danger/25 bg-black/45 pointer-events-none" style={{ boxShadow: "0 0 16px rgba(239,68,68,0.35), 0 0 40px rgba(239,68,68,0.12)" }} />
@@ -477,6 +487,11 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
                   >
                     <span className="h-1.5 w-1.5 rounded-full bg-success shadow-[0_0_6px_rgba(34,197,94,0.7)]" />
                     <span className="text-[0.6rem] font-semibold text-brand-white opacity-70">Variants ready</span>
+                  </div>
+                )}
+                {isStale && !chatThinking && !variantsGenerating && !chatUpdated && !variantsReady && (
+                  <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-amber-500/15 border border-amber-500/40 backdrop-blur-sm z-10">
+                    <span className="text-[0.6rem] font-semibold tracking-[0.06em] text-amber-400">EDITED</span>
                   </div>
                 )}
                 {!compliance.pass && (
@@ -545,14 +560,14 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
                         EDIT
                       </button>
                       <button
-                        onClick={() => handleApprove(story.index, approved ? "clear" : "approve")}
+                        onClick={() => handleApprove(story.index, approved && !isStale ? "clear" : "approve")}
                         className={`${actionBtn} border backdrop-blur-sm ${
-                          approved
+                          approved && !isStale
                             ? "border-success bg-success/20 text-success"
                             : "border-border-mid bg-brand-black/80 text-brand-white"
                         }`}
                       >
-                        {approved ? "✓" : "APPROVE"}
+                        {approved && !isStale ? "✓" : "APPROVE"}
                       </button>
                       <button
                         onClick={() => rejected ? handleApprove(story.index, "clear") : startReject(story.index)}
@@ -607,14 +622,14 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
                       EDIT
                     </button>
                     <button
-                      onClick={() => handleApprove(story.index, approved ? "clear" : "approve")}
+                      onClick={() => handleApprove(story.index, approved && !isStale ? "clear" : "approve")}
                       className={`${actionBtn} border ${
-                        approved
+                        approved && !isStale
                           ? "border-success bg-success/20 text-success"
                           : "border-border-mid bg-brand-black text-brand-white"
                       }`}
                     >
-                      {approved ? "✓" : "APPROVE"}
+                      {approved && !isStale ? "✓" : "APPROVE"}
                     </button>
                     <button
                       onClick={() => rejected ? handleApprove(story.index, "clear") : startReject(story.index)}
