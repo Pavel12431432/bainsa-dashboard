@@ -141,8 +141,13 @@ export default function AgentChat({ date, open, agent, outputExpanded, onClose, 
         newSession: isNewSession,
       });
       if (!res.ok) {
-        const text = await res.text();
-        try { throw new Error(JSON.parse(text).error); } catch { throw new Error(`Server error (${res.status})`); }
+        const body = await res.text();
+        let message = `Server error (${res.status})`;
+        try {
+          const parsed = JSON.parse(body);
+          if (parsed?.error) message = String(parsed.error);
+        } catch {}
+        throw new Error(message);
       }
       const data = await res.json();
       const reply = data.reply?.trim();

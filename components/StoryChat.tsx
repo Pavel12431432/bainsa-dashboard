@@ -77,7 +77,12 @@ export default function StoryChat({ story, date, sessionId, onUpdate, onReset, d
 
       if (!res.ok) {
         const body = await res.text();
-        try { throw new Error(JSON.parse(body).error); } catch { throw new Error(`Server error (${res.status})`); }
+        let message = `Server error (${res.status})`;
+        try {
+          const parsed = JSON.parse(body);
+          if (parsed?.error) message = String(parsed.error);
+        } catch {}
+        throw new Error(message);
       }
       const data = await res.json();
 

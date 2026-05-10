@@ -18,13 +18,13 @@ export async function POST(
   const idxNum = parseInt(index, 10);
   const state = await setApproval(date, idxNum, action, feedback);
   const kind: LogKind | null =
-    action === "approved" ? "story.approve" : action === "rejected" ? "story.reject" : null;
+    action === "approve" ? "story.approve" : action === "reject" ? "story.reject" : null;
   if (kind) {
     await appendLog({
       kind,
       actor: "user",
       ok: true,
-      summary: `${action === "approved" ? "Approved" : "Rejected"} story #${idxNum} on ${date}`,
+      summary: `${action === "approve" ? "Approved" : "Rejected"} story #${idxNum} on ${date}`,
       meta: {
         date,
         storyIndex: idxNum,

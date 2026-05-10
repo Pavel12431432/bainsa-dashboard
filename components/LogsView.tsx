@@ -66,7 +66,7 @@ function presetFromIso(preset: DatePreset): string | undefined {
   if (preset === "all") return undefined;
   const now = new Date();
   if (preset === "today") {
-    now.setUTCHours(0, 0, 0, 0);
+    now.setHours(0, 0, 0, 0);
     return now.toISOString();
   }
   const days = preset === "7d" ? 7 : 30;
