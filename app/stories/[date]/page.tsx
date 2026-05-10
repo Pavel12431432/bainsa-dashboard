@@ -7,6 +7,7 @@ import { readMarcoStories } from "@/lib/marcoHandoff";
 import { fileExists } from "@/lib/fs";
 import { isValidDate } from "@/lib/date";
 import { requireEnv } from "@/lib/env";
+import { deriveStale } from "@/lib/storyHash";
 import StoryGrid from "@/components/StoryGrid";
 import HeaderShell from "@/components/HeaderShell";
 
@@ -31,13 +32,15 @@ export default async function StoriesPage({ params, searchParams }: Props) {
     readMarcoStories(date),
   ]);
 
+  const stale = deriveStale(stories, approvals.approved, approvals.approvedHash);
+
   return (
     <div className="min-h-screen bg-brand-black">
       <HeaderShell date={date} />
 
       {/* Content */}
       <main className="p-5">
-        <StoryGrid date={date} initialStories={stories} initialApprovals={approvals} initialPosted={posted} initialMarco={marco} highlightIndex={highlight ? Number(highlight) : undefined} />
+        <StoryGrid date={date} initialStories={stories} initialApprovals={approvals} initialPosted={posted} initialMarco={marco} initialStale={stale} highlightIndex={highlight ? Number(highlight) : undefined} />
       </main>
     </div>
   );

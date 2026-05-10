@@ -7,6 +7,7 @@ import { readMarcoStories } from "@/lib/marcoHandoff";
 import { fileExists } from "@/lib/fs";
 import { isValidDate } from "@/lib/date";
 import { requireEnv } from "@/lib/env";
+import { deriveStale } from "@/lib/storyHash";
 
 export async function GET(
   _req: NextRequest,
@@ -19,7 +20,7 @@ export async function GET(
   const filePath = `${requireEnv("STORIES_PATH")}/${date}.md`;
 
   if (!(await fileExists(filePath))) {
-    return NextResponse.json({ stories: [], approvals: { approved: [], rejected: [] }, posted: {}, marco: {} });
+    return NextResponse.json({ stories: [], approvals: { approved: [], rejected: [] }, posted: {}, marco: {}, stale: [] });
   }
 
   const [markdown, approvals, posted, marco] = await Promise.all([
@@ -29,5 +30,7 @@ export async function GET(
     readMarcoStories(date),
   ]);
 
-  return NextResponse.json({ stories: parseStories(markdown), approvals, posted, marco });
+  const stories = parseStories(markdown);
+  const stale = deriveStale(stories, approvals.approved, approvals.approvedHash);
+  return NextResponse.json({ stories, approvals, posted, marco, stale });
 }
