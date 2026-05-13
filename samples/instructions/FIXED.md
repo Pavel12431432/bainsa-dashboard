@@ -14,9 +14,72 @@ When asked to generate stories (from a date or "today"):
 
 1. Read `../news-researcher/handoffs/YYYY-MM-DD.md` for that date's news
 2. Read `../brand/brand_guidelines.md` for brand rules
-3. For each story in the handoff, produce one Instagram story card
-4. Save all stories to `stories/YYYY-MM-DD.md`
-5. Reply with a summary of what you produced
+3. Decide for each news item whether it works as a single card or needs a multi-card chain (see "Topic Chains" below). Aim for 1-2 chains per day, the rest standalone cards.
+4. Produce one Instagram story card per item (or per chain segment), with chain metadata where applicable
+5. Save all stories to `stories/YYYY-MM-DD.md`
+6. Reply with a summary of what you produced — list standalone cards and each chain with its segments
+
+## Topic Chains
+
+Most news items work as a single card. But some topics are too rich for one card and benefit from being told across 2-3 connected cards — a "chain". Your daily output is a **mix**: mostly standalone cards, with **1-2 chains** when the news warrants them.
+
+### When to use a chain (vs a single card)
+
+Use a chain when the topic genuinely needs multiple angles to be told well:
+
+- **An unfolding event** with multiple beats (announcement → impact → reaction)
+- **A paradigm shift** with several facets (research finding + product implementation + industry consequence)
+- **A controversy** with sides (event + responses + stakes for the reader)
+- **A deep technical change** with both a what and a so-what
+
+Default to a single card. Reach for a chain only when one card would force you to leave too much on the table. If you find yourself stretching to fill a 2-card chain, drop it back to a single card — that's a sign the topic is single-card material.
+
+### Chain rules
+
+- **Length**: 2 or 3 stories per chain. Never 1 (that is just a standalone card), never 4+.
+- **Frequency**: 1-2 chains per day. Zero is fine on days when no topic warrants one.
+- **Consistent division and accent across the chain**: all stories in the same chain should share a division and accent color. The dashboard will warn if they don't. Pick the division that fits the chain's overall topic, even if one beat could individually belong to another division.
+- **Order**: stories in a chain appear in their narrative order in the markdown — hook first, closer last.
+
+### Chain roles
+
+Each story in a chain has a role:
+
+- **hook** — opens the chain. Establishes the topic. The most attention-grabbing of the chain.
+- **develop** — middle. Adds detail, context, or a second angle. Used only in 3-story chains.
+- **closer** — final. Ties the topic back to the reader (Bocconi-student angle, future implication, action).
+
+For a 2-story chain: `hook` + `closer`. For a 3-story chain: `hook` + `develop` + `closer`.
+
+### Role conventions
+
+Each role plays a different job. These are soft preferences — adapt when the content demands it, but follow them as a default so the chain reads as a sequence and not three standalones in a row.
+
+**Hooks** (always the first card in a chain):
+- `headlineSize: large`
+- `contentType: text` (rarely bullets)
+- Body: 1-2 short sentences that tease the topic without resolving it
+- Goal: provoke curiosity, stop the scroll. The reader should *want* the next card
+
+**Develop** (middle card, only in 3-card chains):
+- `headlineSize: default`
+- `contentType: bullets` or `text` (whichever fits the substance)
+- Body: the meat — facts, mechanics, the part that needs space
+- Goal: carry the chain's weight
+
+**Closer** (always the last card in a chain):
+- `headlineSize: default` or `compact`
+- `bodyWeight: semibold` OK
+- Body: the takeaway. Bocconi/student angle explicit. What does the reader do with this?
+- Goal: pay off the hook
+
+### Chain identifier
+
+The `Chain` field is a 2-4 word topic name (e.g. "AI in healthcare", "Open-source models", "AI hiring impact"). Use the EXACT same string across all stories in the same chain — copy it, don't retype it. The dashboard groups stories by exact match on the Chain string.
+
+### Standalone cards
+
+A standalone card is a story with **no `Chain` and no `Chain role` fields** in its output block. Most cards on a typical day are standalone.
 
 ## Output Format
 
@@ -45,10 +108,28 @@ CRITICAL: Every field value MUST be on the SAME LINE as its label. Never put val
 ---
 ```
 
+For stories that are part of a chain, add `Chain` and `Chain role` as the first two fields (before `Division`):
+
+```markdown
+---
+## Story 1
+
+**Chain:** AI in healthcare
+**Chain role:** hook
+
+**Division:** Culture
+... (all other fields exactly as in the standalone example above)
+---
+```
+
+Standalone cards omit both `Chain` and `Chain role`.
+
 ### Field reference
 
 | Field | Values | What it controls |
 |---|---|---|
+| **Chain** | 2-4 word topic name | OPTIONAL — present only when the story is part of a chain. Identical string across all stories in the same chain |
+| **Chain role** | `hook`, `develop`, `closer` | OPTIONAL — present only when `Chain` is present. Position within the chain |
 | **Division** | `Projects`, `Analysis`, `Culture` | Category + accent color |
 | **Accent color** | Hex matching division | Projects `#2c40e8`, Analysis `#fe6203`, Culture `#fe43a7` |
 | **Layout** | `top`, `center`, `bottom` | Where the headline+body sit vertically on the card |
@@ -87,7 +168,7 @@ CRITICAL: Every field value MUST be on the SAME LINE as its label. Never put val
   - **bullets**: max 200 characters. Keep each bullet under 8 words.
   - **quote**: max 200 characters. One punchy statement.
 - NEVER write "(max N words)" or any parenthetical hints in the output — just write the actual text directly after the colon. The dashboard parser breaks if you include hints like "(max 8 words)".
-- Every story must have all fields. Do not skip any.
+- Every required field must be present on every story. `Chain` and `Chain role` are the only optional fields, and they are present together (both or neither).
 
 ## Divisions — How to Label Stories
 
@@ -114,4 +195,4 @@ When in doubt between Analysis and another division, pick the other one. Analysi
 ## Continuity
 
 - Save outputs to `stories/YYYY-MM-DD.md`
-- Keep `memory/YYYY-MM-DD.md` with brief notes on decisions made
+- Keep `memory/YYYY-MM-DD.md` with brief notes on decisions made — including which news items you grouped into chains and why

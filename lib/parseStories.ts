@@ -1,4 +1,4 @@
-import { Story, Layout, ContentType, HeadlineSize, BodyWeight, TextAlign, CornerSize, AccentBar, GhostAccent } from "@/types";
+import { Story, Layout, ContentType, HeadlineSize, BodyWeight, TextAlign, CornerSize, AccentBar, GhostAccent, ChainRole } from "@/types";
 
 function extractField(block: string, key: string): string {
   const re = new RegExp(`\\*\\*${key}:\\*\\*[ \\t]*(.+)`, "i");
@@ -81,6 +81,22 @@ function parseGhostAccent(val: string): GhostAccent {
   return "none";
 }
 
+function parseChainRole(val: unknown): ChainRole | undefined {
+  if (typeof val !== "string") return undefined;
+  const v = val.toLowerCase().trim();
+  if (v === "hook" || v === "develop" || v === "closer") return v;
+  return undefined;
+}
+
+// Chain and chainRole must be present together. If either is missing or
+// invalid, treat the story as standalone (drop both).
+function normalizeChainPair(chainRaw: unknown, roleRaw: unknown): { chain?: string; chainRole?: ChainRole } {
+  const chain = typeof chainRaw === "string" && chainRaw.trim() ? chainRaw.trim() : undefined;
+  const chainRole = parseChainRole(roleRaw);
+  if (!chain || !chainRole) return {};
+  return { chain, chainRole };
+}
+
 export function parseStories(markdown: string): Story[] {
   const stories: Story[] = [];
 
@@ -101,9 +117,11 @@ export function parseStories(markdown: string): Story[] {
     if (jsonMatch) {
       try {
         const data = JSON.parse(jsonMatch[1]);
+        const chainPair = normalizeChainPair(data.chain, data.chainRole);
         stories.push({
           index,
           title,
+          ...chainPair,
           division: data.division ?? "Analysis",
           accentColor: data.accentColor ?? "#fe6203",
           layout: parseLayout(data.layout ?? data.layoutTemplate ?? ""),
@@ -126,9 +144,11 @@ export function parseStories(markdown: string): Story[] {
     }
 
     // Regex parser — new fields fall back to defaults when missing (backward compat)
+    const chainPair = normalizeChainPair(extractField(section, "Chain"), extractField(section, "Chain role"));
     stories.push({
       index,
       title,
+      ...chainPair,
       division: extractField(section, "Division") || "Analysis",
       accentColor: extractField(section, "Accent color") || "#fe6203",
       layout: parseLayout(extractField(section, "Layout")),

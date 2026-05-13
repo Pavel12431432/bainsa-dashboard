@@ -6,10 +6,13 @@ export type TextAlign = "left" | "justify";
 export type CornerSize = "small" | "medium";
 export type AccentBar = "bottom" | "top" | "none";
 export type GhostAccent = "none" | "bottom-right" | "center" | "top-left";
+export type ChainRole = "hook" | "develop" | "closer";
 
 export interface Story {
   index: number;           // 1-based
   title: string;           // from "## Story N: Title"
+  chain?: string;          // topic name when story is part of a chain
+  chainRole?: ChainRole;   // position within chain; present iff chain is set
   division: "Analysis" | "Projects" | "Culture" | string;
   accentColor: string;     // hex e.g. "#fe6203"
   layout: Layout;
