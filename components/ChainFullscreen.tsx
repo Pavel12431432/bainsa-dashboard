@@ -179,18 +179,19 @@ export default function ChainFullscreen({
       aria-label={`Chain preview: ${chain}`}
       onClick={handleBackdropClick}
     >
-      {/* Header */}
+      {/* Header — only the chain-name group and the close button are
+          no-close zones; the rest of the row passes through to backdrop. */}
       <div
-        data-fs-content
         className="flex items-center justify-between px-6 text-brand-white shrink-0"
         style={{ height: HEADER_H }}
       >
-        <div className="flex items-baseline gap-3">
+        <div data-fs-content className="flex items-baseline gap-3 px-1 py-1">
           <span className="text-xs uppercase tracking-[0.12em] font-semibold opacity-90">{chain}</span>
           <span className="text-[0.65rem] tabular-nums opacity-50">{total} cards</span>
         </div>
         <button
           type="button"
+          data-fs-content
           onClick={initiateClose}
           className="p-2 rounded-full hover:bg-white/10 transition-colors cursor-pointer"
           aria-label="Close fullscreen"
@@ -216,30 +217,31 @@ export default function ChainFullscreen({
       >
         {isMobile
           ? stories.map((story, i) => (
-              <div key={story.index} data-fs-card-idx={i} data-fs-content>
+              <div key={story.index} data-fs-card-idx={i} data-fs-content className="p-1.5">
                 {renderItem(story)}
               </div>
             ))
           : (
             <div
-              data-fs-content
               className="flex items-center"
               style={{ gap: GAP_DESKTOP * scale }}
             >
               {stories.map((story) => (
-                <div key={story.index}>{renderItem(story)}</div>
+                <div key={story.index} data-fs-content className="p-1.5">
+                  {renderItem(story)}
+                </div>
               ))}
             </div>
           )}
       </div>
 
-      {/* CARD / PHONE toggle — under the items, above the action footer. */}
+      {/* CARD / PHONE toggle — under the items, above the action footer.
+          Only the pill itself is no-close; clicks on either side of it close. */}
       <div
-        data-fs-content
         className="flex items-center justify-center shrink-0"
         style={{ height: TOGGLE_H }}
       >
-        <div className="flex gap-1 bg-surface rounded-lg p-1">
+        <div data-fs-content className="flex gap-1 bg-surface rounded-lg p-1">
           <button
             type="button"
             onClick={() => setPreview("card")}
@@ -261,9 +263,10 @@ export default function ChainFullscreen({
         </div>
       </div>
 
-      {/* Footer — APPROVE ALL / REJECT ALL with inline status to the left. */}
+      {/* Footer — APPROVE ALL / REJECT ALL with inline status to the left.
+          Only the buttons and error text are no-close zones; empty areas of
+          the footer row close. */}
       <div
-        data-fs-content
         className="flex items-center justify-center gap-4 px-6 shrink-0 relative"
         style={{ height: FOOTER_H }}
       >
@@ -272,7 +275,7 @@ export default function ChainFullscreen({
             grid below, matching ExportDialog. */}
         {status.kind === "error" && (
           <div className="absolute left-6 right-6 flex items-center justify-start pointer-events-none">
-            <span className="text-xs font-semibold tracking-[0.06em] text-danger">
+            <span data-fs-content className="text-xs font-semibold tracking-[0.06em] text-danger pointer-events-auto">
               {status.message}
             </span>
           </div>
@@ -280,6 +283,7 @@ export default function ChainFullscreen({
 
         <button
           type="button"
+          data-fs-content
           onClick={() => runAction("approve", onApproveAll)}
           disabled={status.kind === "busy"}
           className="px-6 py-2.5 rounded-[5px] border border-success bg-success/20 text-success text-xs font-semibold tracking-[0.06em] backdrop-blur-sm cursor-pointer hover:bg-success/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -288,6 +292,7 @@ export default function ChainFullscreen({
         </button>
         <button
           type="button"
+          data-fs-content
           onClick={() => runAction("reject", onRejectAll)}
           disabled={status.kind === "busy"}
           className="px-6 py-2.5 rounded-[5px] border border-danger/40 bg-danger/15 text-danger text-xs font-semibold tracking-[0.06em] backdrop-blur-sm cursor-pointer hover:bg-danger/25 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
