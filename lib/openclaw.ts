@@ -10,6 +10,7 @@ const AGENT_CLI_NAMES = {
   marco: "news-researcher",
   sofia: "story-generator",
   lorenzo: "story-editor",
+  anna: "story-evaluator",
 } as const;
 export type AgentId = keyof typeof AGENT_CLI_NAMES;
 
@@ -85,8 +86,35 @@ function demoResponse(agent: AgentId, message: string): string {
     };
     return JSON.stringify(demoProposal, null, 2);
   }
+  // Anna — evaluator agent receives an EvaluationRequest with one story
+  if (agent === "anna" && message.includes("<EvaluationRequest>")) {
+    // Hash the message for deterministic-but-varied scores per story
+    const hash = (s: string) => {
+      let h = 0;
+      for (let i = 0; i < s.length; i++) h = ((h * 31 + s.charCodeAt(i)) | 0);
+      return Math.abs(h);
+    };
+    const h = hash(message);
+    const brandVoice = 70 + (h % 26);                 // 70-95
+    const engagement = 60 + ((h * 7) % 35);           // 60-94
+    const isChain = message.includes("Chain context:");
+    const topicCoherence = isChain ? 65 + ((h * 11) % 30) : null;  // 65-94 or null
+    return JSON.stringify({
+      brandVoice,
+      brandVoiceRationale: "Demo: voice reads consistent with the BAINSA register — restrained, student-aware, factual without hype.",
+      engagement,
+      engagementRationale: "Demo: hook lands in the first line; the body answers \"why care\" before the source tag.",
+      topicCoherence,
+      topicCoherenceRationale: topicCoherence != null
+        ? "Demo: this card pulls its weight inside the chain — the angle complements the others without overlap."
+        : null,
+    });
+  }
   // Free-form agent drawer chat
-  const who = agent === "marco" ? "Marco" : agent === "sofia" ? "Sofia" : "Lorenzo";
+  const who = agent === "marco" ? "Marco"
+    : agent === "sofia" ? "Sofia"
+    : agent === "lorenzo" ? "Lorenzo"
+    : "Anna";
   return `**Demo mode** — ${who} isn't actually running. In production I'd respond to:\n\n> ${message.slice(0, 200)}${message.length > 200 ? "…" : ""}\n\nSet \`DEMO_MODE=false\` and configure OpenClaw to get real agent responses.`;
 }
 

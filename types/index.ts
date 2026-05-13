@@ -72,3 +72,17 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
 }
+
+export interface StoryScore {
+  storyIndex: number;
+  brandVoice: number;                           // 0-100
+  brandVoiceRationale: string;
+  engagement: number;                           // 0-100
+  engagementRationale: string;
+  topicCoherence: number | null;                // 0-100, null when story is standalone (no chain)
+  topicCoherenceRationale: string | null;
+  total: number;                                // weighted average, computed at write time
+  evaluatedAt: string;                          // ISO timestamp
+}
+
+export type StoryScoreMap = Record<number, StoryScore>;

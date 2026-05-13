@@ -151,6 +151,13 @@ export default function HamburgerMenu({ open, onClose, onOpenAgentOutput, hasDat
           Teach Sofia
         </Link>
         <Link
+          href="/harness"
+          onClick={onClose}
+          className="block w-full text-left px-6 py-3 text-[0.75rem] font-semibold text-brand-white opacity-55 hover:opacity-90 hover:bg-border transition-opacity duration-150 no-underline"
+        >
+          Evaluation Harness
+        </Link>
+        <Link
           href="/logs"
           onClick={onClose}
           className="block w-full text-left px-6 py-3 text-[0.75rem] font-semibold text-brand-white opacity-55 hover:opacity-90 hover:bg-border transition-opacity duration-150 no-underline"

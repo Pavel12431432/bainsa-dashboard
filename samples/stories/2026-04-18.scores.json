@@ -1,0 +1,57 @@
+{
+  "1": {
+    "storyIndex": 1,
+    "brandVoice": 72,
+    "brandVoiceRationale": "Voice is mostly there but slips into press-release tone in the body.",
+    "engagement": 65,
+    "engagementRationale": "Hook is descriptive rather than stopping; consider leading with the impact.",
+    "topicCoherence": null,
+    "topicCoherenceRationale": null,
+    "total": 69,
+    "evaluatedAt": "2026-04-18T13:15:00.000Z"
+  },
+  "2": {
+    "storyIndex": 2,
+    "brandVoice": 78,
+    "brandVoiceRationale": "Reads like BAINSA — clean, factual, restrained.",
+    "engagement": 72,
+    "engagementRationale": "Solid hook; CTA could be tighter for a student audience.",
+    "topicCoherence": null,
+    "topicCoherenceRationale": null,
+    "total": 75,
+    "evaluatedAt": "2026-04-18T13:15:00.000Z"
+  },
+  "3": {
+    "storyIndex": 3,
+    "brandVoice": 68,
+    "brandVoiceRationale": "A bit corporate-flavored; the body could feel less press-release.",
+    "engagement": 60,
+    "engagementRationale": "Headline buries the lede — the most interesting fact is in line two.",
+    "topicCoherence": null,
+    "topicCoherenceRationale": null,
+    "total": 64,
+    "evaluatedAt": "2026-04-18T13:15:00.000Z"
+  },
+  "4": {
+    "storyIndex": 4,
+    "brandVoice": 75,
+    "brandVoiceRationale": "Clean voice, restrained, on-brand.",
+    "engagement": 78,
+    "engagementRationale": "Strong number-led hook lands within the first eight words.",
+    "topicCoherence": null,
+    "topicCoherenceRationale": null,
+    "total": 77,
+    "evaluatedAt": "2026-04-18T13:15:00.000Z"
+  },
+  "5": {
+    "storyIndex": 5,
+    "brandVoice": 82,
+    "brandVoiceRationale": "Confident, factual, BAINSA-shaped.",
+    "engagement": 68,
+    "engagementRationale": "Good content but the closer is flat; needs a Bocconi-relevant takeaway.",
+    "topicCoherence": null,
+    "topicCoherenceRationale": null,
+    "total": 75,
+    "evaluatedAt": "2026-04-18T13:15:00.000Z"
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "1": {
+    "storyIndex": 1,
+    "brandVoice": 85,
+    "brandVoiceRationale": "Clean BAINSA voice, no buzzwords, factual.",
+    "engagement": 80,
+    "engagementRationale": "Hook lands fast, body delivers the why for a Bocconi reader.",
+    "topicCoherence": null,
+    "topicCoherenceRationale": null,
+    "total": 83,
+    "evaluatedAt": "2026-04-19T13:15:00.000Z"
+  },
+  "2": {
+    "storyIndex": 2,
+    "brandVoice": 80,
+    "brandVoiceRationale": "Good voice; one slightly long sentence drifts toward summary.",
+    "engagement": 75,
+    "engagementRationale": "Decent hook, but the source feels secondary to the headline framing.",
+    "topicCoherence": null,
+    "topicCoherenceRationale": null,
+    "total": 78,
+    "evaluatedAt": "2026-04-19T13:15:00.000Z"
+  },
+  "3": {
+    "storyIndex": 3,
+    "brandVoice": 88,
+    "brandVoiceRationale": "Punchy, on-brand, restrained.",
+    "engagement": 82,
+    "engagementRationale": "First eight words hook; body explains the stakes for the reader.",
+    "topicCoherence": null,
+    "topicCoherenceRationale": null,
+    "total": 85,
+    "evaluatedAt": "2026-04-19T13:15:00.000Z"
+  },
+  "4": {
+    "storyIndex": 4,
+    "brandVoice": 78,
+    "brandVoiceRationale": "Readable, not quite the BAINSA register — slightly more journalistic than internal.",
+    "engagement": 78,
+    "engagementRationale": "Good hook, body could land harder on the implication.",
+    "topicCoherence": null,
+    "topicCoherenceRationale": null,
+    "total": 78,
+    "evaluatedAt": "2026-04-19T13:15:00.000Z"
+  }
+}

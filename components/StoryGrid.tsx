@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from "react";
-import { Story, ApprovalState, PostedMap } from "@/types";
+import { Story, ApprovalState, PostedMap, StoryScoreMap } from "@/types";
 import type { MarcoStoryMap } from "@/lib/marcoHandoff";
 import { apiFetch } from "@/lib/fetch";
 import { checkCompliance } from "@/lib/compliance";
@@ -15,6 +15,7 @@ import StoryEditor from "./StoryEditor";
 import ExportDialog from "./ExportDialog";
 import ChainStack from "./ChainStack";
 import ChainFullscreen from "./ChainFullscreen";
+import ScorePanel from "./ScorePanel";
 
 type StoryGroup = { kind: "single"; story: Story } | { kind: "chain"; chain: string; stories: Story[] };
 
@@ -24,6 +25,7 @@ interface Props {
   initialApprovals: ApprovalState;
   initialPosted?: PostedMap;
   initialMarco?: MarcoStoryMap;
+  initialScores?: StoryScoreMap;
   highlightIndex?: number;
 }
 
@@ -46,7 +48,7 @@ const DIVISION_COLORS: Record<Division, string> = {
   Analysis: "#fe6203",
 };
 
-export default function StoryGrid({ date, initialStories, initialApprovals, initialPosted = {}, initialMarco = {}, highlightIndex }: Props) {
+export default function StoryGrid({ date, initialStories, initialApprovals, initialPosted = {}, initialMarco = {}, initialScores = {}, highlightIndex }: Props) {
   const [stories, setStories] = useState<Story[]>(initialStories);
   const storiesRef = useRef(stories);
   storiesRef.current = stories;
@@ -70,6 +72,8 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
   const [marco, setMarco] = useState<MarcoStoryMap>(initialMarco);
   const [editing, setEditing] = useState<Story | null>(null);
   const [showExport, setShowExport] = useState(false);
+  const [scores, setScores] = useState<StoryScoreMap>(initialScores);
+  const [evaluating, setEvaluating] = useState(false);
   const [toast, setToast] = useState<string>("");
   const [fullscreenChain, setFullscreenChain] = useState<StoryGroup | null>(null);
 
@@ -510,8 +514,12 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
           const approved = approvals.approved.includes(story.index);
           const rejected = approvals.rejected.includes(story.index);
           const marcoEntry = marco[story.index];
+          const storyScore = scores[story.index];
           return (
             <>
+              {/* Score panel — below card, visible on desktop and mobile when evaluated */}
+              {storyScore && <ScorePanel score={storyScore} />}
+
               {/* Action buttons — below card (mobile only) */}
               <div className="flex sm:hidden flex-col gap-2 mt-2">
                 {rejectingIndex === story.index ? (
@@ -635,7 +643,38 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
         />
       )}
 
-      <div className="mt-10 flex justify-center">
+      <div className="mt-10 flex justify-center gap-3">
+        <button
+          onClick={async () => {
+            if (evaluating) return;
+            setEvaluating(true);
+            try {
+              const res = await apiFetch(`/api/scores/${date}`, {});
+              if (res.ok) {
+                const data = await res.json();
+                if (data.scores) setScores(data.scores);
+                setToast(`Anna evaluated ${data.evaluated} stor${data.evaluated === 1 ? "y" : "ies"}`);
+              } else {
+                const err = await res.json().catch(() => ({}));
+                setToast(`Eval failed: ${err.error ?? "unknown error"}`);
+              }
+            } catch (e) {
+              setToast(`Eval failed: ${e instanceof Error ? e.message : "unknown error"}`);
+            } finally {
+              setEvaluating(false);
+            }
+          }}
+          disabled={evaluating}
+          className="px-6 py-3 rounded-lg border border-border-mid bg-transparent text-brand-white text-xs font-semibold tracking-[0.06em] cursor-pointer hover:bg-border transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          {evaluating && (
+            <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          )}
+          {evaluating ? "EVALUATING…" : "RE-EVALUATE"}
+        </button>
         <button
           onClick={() => setShowExport(true)}
           className="px-6 py-3 rounded-lg border border-border-mid bg-transparent text-brand-white text-xs font-semibold tracking-[0.06em] cursor-pointer hover:bg-border transition-colors duration-150"

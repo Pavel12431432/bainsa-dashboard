@@ -4,6 +4,7 @@ import { parseStories } from "@/lib/parseStories";
 import { readApprovals } from "@/lib/approvals";
 import { readPosted } from "@/lib/posted";
 import { readMarcoStories } from "@/lib/marcoHandoff";
+import { readScores } from "@/lib/scores";
 import { fileExists } from "@/lib/fs";
 import { isValidDate } from "@/lib/date";
 import { requireEnv } from "@/lib/env";
@@ -24,11 +25,12 @@ export default async function StoriesPage({ params, searchParams }: Props) {
   const filePath = `${requireEnv("STORIES_PATH")}/${date}.md`;
 
   const exists = await fileExists(filePath);
-  const [stories, approvals, posted, marco] = await Promise.all([
+  const [stories, approvals, posted, marco, scores] = await Promise.all([
     exists ? readFile(filePath, "utf-8").then(parseStories) : Promise.resolve([]),
     readApprovals(date),
     readPosted(date),
     readMarcoStories(date),
+    readScores(date),
   ]);
 
   return (
@@ -37,7 +39,7 @@ export default async function StoriesPage({ params, searchParams }: Props) {
 
       {/* Content */}
       <main className="p-5">
-        <StoryGrid date={date} initialStories={stories} initialApprovals={approvals} initialPosted={posted} initialMarco={marco} highlightIndex={highlight ? Number(highlight) : undefined} />
+        <StoryGrid date={date} initialStories={stories} initialApprovals={approvals} initialPosted={posted} initialMarco={marco} initialScores={scores} highlightIndex={highlight ? Number(highlight) : undefined} />
       </main>
     </div>
   );

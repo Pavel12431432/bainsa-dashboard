@@ -1,0 +1,57 @@
+{
+  "1": {
+    "storyIndex": 1,
+    "brandVoice": 88,
+    "brandVoiceRationale": "Restrained voice, technical but accessible — BAINSA-shaped.",
+    "engagement": 84,
+    "engagementRationale": "Hook leans on the physical AI angle and lands fast.",
+    "topicCoherence": null,
+    "topicCoherenceRationale": null,
+    "total": 86,
+    "evaluatedAt": "2026-04-20T13:15:00.000Z"
+  },
+  "2": {
+    "storyIndex": 2,
+    "brandVoice": 85,
+    "brandVoiceRationale": "Confident, restrained, factual without hype.",
+    "engagement": 82,
+    "engagementRationale": "Statistic-led hook works; the 66% figure stops the scroll.",
+    "topicCoherence": 82,
+    "topicCoherenceRationale": "Sets up the workforce conversation thread cleanly — leaves room for the closer.",
+    "total": 83,
+    "evaluatedAt": "2026-04-20T13:15:00.000Z"
+  },
+  "3": {
+    "storyIndex": 3,
+    "brandVoice": 90,
+    "brandVoiceRationale": "Voice is excellent here — leans into the human angle without losing the brand.",
+    "engagement": 88,
+    "engagementRationale": "Strong closer; lands on the worker side as a natural counterpoint.",
+    "topicCoherence": 85,
+    "topicCoherenceRationale": "Closes the chain on the worker perspective — complementary to the hook's industry framing.",
+    "total": 88,
+    "evaluatedAt": "2026-04-20T13:15:00.000Z"
+  },
+  "4": {
+    "storyIndex": 4,
+    "brandVoice": 82,
+    "brandVoiceRationale": "Slightly informal but on-brand; the bullet body keeps it crisp.",
+    "engagement": 80,
+    "engagementRationale": "Hook implies action — \"agents got their checkout counter\" lands.",
+    "topicCoherence": 78,
+    "topicCoherenceRationale": "Sets up the agents-in-production thread; needs the closer to ground it in the real world.",
+    "total": 80,
+    "evaluatedAt": "2026-04-20T13:15:00.000Z"
+  },
+  "5": {
+    "storyIndex": 5,
+    "brandVoice": 86,
+    "brandVoiceRationale": "Voice is on-brand and clean — slightly more concrete than the hook.",
+    "engagement": 78,
+    "engagementRationale": "Hook is good, body runs a sentence longer than ideal for a closer.",
+    "topicCoherence": 80,
+    "topicCoherenceRationale": "Ties the chain back to a deployed agent in industry — the practical follow-up to the Visa hook.",
+    "total": 82,
+    "evaluatedAt": "2026-04-20T13:15:00.000Z"
+  }
+}
