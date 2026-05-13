@@ -14,7 +14,6 @@ import ComplianceBadge from "./ComplianceBadge";
 import StoryEditor from "./StoryEditor";
 import ExportDialog from "./ExportDialog";
 import ChainStack from "./ChainStack";
-import ChainFullscreen from "./ChainFullscreen";
 import ScorePanel from "./ScorePanel";
 
 type StoryGroup = { kind: "single"; story: Story } | { kind: "chain"; chain: string; stories: Story[] };
@@ -75,7 +74,6 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
   const [scores, setScores] = useState<StoryScoreMap>(initialScores);
   const [evaluating, setEvaluating] = useState(false);
   const [toast, setToast] = useState<string>("");
-  const [fullscreenChain, setFullscreenChain] = useState<StoryGroup | null>(null);
 
   useEffect(() => {
     if (!toast) return;
@@ -626,22 +624,12 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
                   stories={g.stories}
                   renderCardVisual={renderCardVisual}
                   renderActions={renderActions}
-                  onExpand={() => setFullscreenChain(g)}
                 />
               );
             })}
           </div>
         );
       })()}
-
-      {/* Fullscreen chain carousel — IG-style swipe through chain stories */}
-      {fullscreenChain && fullscreenChain.kind === "chain" && (
-        <ChainFullscreen
-          chain={fullscreenChain.chain}
-          stories={fullscreenChain.stories}
-          onClose={() => setFullscreenChain(null)}
-        />
-      )}
 
       <div className="mt-10 flex justify-center gap-3">
         <button
