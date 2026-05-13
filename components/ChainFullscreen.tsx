@@ -14,11 +14,21 @@ interface Props {
       that card into view. Desktop ignores it (all cards visible at once). */
   initialIndex?: number;
   onClose: () => void;
-  /** Throw on failure — caller resolves on success, fullscreen surfaces errors
-      inline in the footer. The parent should NOT show a global toast for these
-      actions; the fullscreen owns the success feedback while it's open. */
-  onApproveAll: () => Promise<void>;
-  onRejectAll: () => Promise<void>;
+  /** review (default): cards are static preview, footer shows APPROVE ALL /
+      REJECT ALL bulk action buttons. Opened from the grid stack.
+      preview: cards are clickable to navigate the underlying editor to that
+      card, no bulk buttons. Opened from inside the editor's preview. */
+  mode?: "review" | "preview";
+  /** Required in review mode; ignored in preview. */
+  onApproveAll?: () => Promise<void>;
+  /** Required in review mode; ignored in preview. */
+  onRejectAll?: () => Promise<void>;
+  /** Required in preview mode. Called when the user clicks a card. */
+  onCardClick?: (story: Story) => void;
+  /** Story.index to mark as the current card. In preview mode, this gets a
+      colored outline so the user can see which card the editor is currently
+      on. Defaults to initialIndex when not set. */
+  currentIndex?: number;
 }
 
 type PreviewMode = "card" | "phone";
@@ -45,13 +55,23 @@ export default function ChainFullscreen({
   stories,
   initialIndex,
   onClose,
+  mode = "review",
   onApproveAll,
   onRejectAll,
+  onCardClick,
+  currentIndex,
 }: Props) {
+  const isPreview = mode === "preview";
+  const highlightIndex = currentIndex ?? initialIndex;
   const total = stories.length;
   const [preview, setPreview] = useState<PreviewMode>("card");
-  const [scale, setScale] = useState(0.7);
-  const [isMobile, setIsMobile] = useState(false);
+  // Track raw viewport dimensions; scale is derived during render so a
+  // CARD/PHONE toggle takes effect in the same paint as the switch (no
+  // one-frame flash at the old scale).
+  const [viewport, setViewport] = useState<{ w: number; h: number }>(() => ({
+    w: typeof window !== "undefined" ? window.innerWidth : 1200,
+    h: typeof window !== "undefined" ? window.innerHeight : 800,
+  }));
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -71,32 +91,36 @@ export default function ChainFullscreen({
     setTimeout(onClose, ANIM_OUT_MS);
   };
 
-  const itemW = preview === "phone" ? PHONE_W : CARD_W;
-  const itemH = preview === "phone" ? PHONE_H : CARD_H;
+  // Layout is sized to PHONE (the taller preview) so the cards-area height
+  // doesn't change when the user toggles CARD/PHONE — toggle stays put.
+  const itemW = PHONE_W;
+  const itemH = PHONE_H;
+  const footerH = isPreview ? 0 : FOOTER_H;
+  const isMobile = viewport.w < MOBILE_BREAKPOINT;
 
-  // Compute scale to fit all items in the viewport (side-by-side on desktop,
-  // one per row on mobile). Re-runs when item dimensions change (CARD/PHONE)
-  // so the layout snaps to the new aspect ratio.
   useEffect(() => {
-    const update = () => {
-      const mobile = window.innerWidth < MOBILE_BREAKPOINT;
-      setIsMobile(mobile);
-      if (mobile) {
-        const w = window.innerWidth - VIEWPORT_PAD;
-        setScale(Math.min(w / itemW, 1));
-        return;
-      }
-      const usableW = window.innerWidth - VIEWPORT_PAD;
-      const usableH = window.innerHeight - HEADER_H - TOGGLE_H - FOOTER_H - VIEWPORT_PAD;
-      const totalWidthAt1 = total * itemW + (total - 1) * GAP_DESKTOP;
-      const scaleW = usableW / totalWidthAt1;
-      const scaleH = usableH / itemH;
-      setScale(Math.min(scaleW, scaleH, 1));
-    };
-    update();
+    const update = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
-  }, [total, itemW, itemH]);
+  }, []);
+
+  // Scale is derived during render (not useState/useEffect) so a CARD/PHONE
+  // toggle produces a consistent layout in one paint instead of two.
+  const scale = (() => {
+    if (isMobile) {
+      const w = viewport.w - VIEWPORT_PAD;
+      return Math.min(w / itemW, 1);
+    }
+    const usableW = viewport.w - VIEWPORT_PAD;
+    const usableH = viewport.h - HEADER_H - TOGGLE_H - footerH - VIEWPORT_PAD;
+    const totalWidthAt1 = total * itemW + (total - 1) * GAP_DESKTOP;
+    const scaleW = usableW / totalWidthAt1;
+    const scaleH = usableH / itemH;
+    return Math.min(scaleW, scaleH, 1);
+  })();
+  // Reserved per-card slot size — stable across preview toggles.
+  const slotW = itemW * scale;
+  const slotH = itemH * scale;
 
   // ESC closes
   useEffect(() => {
@@ -119,9 +143,9 @@ export default function ChainFullscreen({
 
   async function runAction(
     action: "approve" | "reject",
-    fn: () => Promise<void>,
+    fn: (() => Promise<void>) | undefined,
   ) {
-    if (status.kind === "busy") return;
+    if (!fn || status.kind === "busy") return;
     setStatus({ kind: "busy", action });
     try {
       await fn();
@@ -145,11 +169,45 @@ export default function ChainFullscreen({
 
   function renderItem(story: Story) {
     const position = stories.findIndex((s) => s.index === story.index) + 1;
-    // Both mounted, inactive hidden via display:none — keeps PhonePreview's
-    // IG chrome images cached so toggling doesn't trigger a load-pop.
+    const highlighted = isPreview && story.index === highlightIndex;
+    const interactive = isPreview && !!onCardClick;
+    const onClick = interactive ? () => onCardClick?.(story) : undefined;
+    // Both card and phone wrappers are mounted (display: none on the inactive
+    // one) so PhonePreview's IG chrome images stay cached across toggles.
+    // The ring lives on the inner wrapper, not the phone-sized slot — radius
+    // is 16 for the card (matches rounded-2xl), 40 × scale for the phone
+    // (matches PhonePreview's screen radius).
+    const cardRadius = 16;
+    const phoneRadius = 40 * scale;
+    const ringStyle = (radius: number) => {
+      if (highlighted) {
+        return {
+          borderRadius: radius,
+          boxShadow: `0 0 0 2px ${story.accentColor}`,
+        };
+      }
+      return { borderRadius: radius };
+    };
+    const innerClass = [
+      "transition-shadow duration-150",
+      interactive ? "cursor-pointer" : "",
+      // Hover ring only on non-highlighted (active card already has accent ring)
+      interactive && !highlighted
+        ? "hover:shadow-[0_0_0_2px_rgba(255,255,255,0.4)]"
+        : "",
+    ].filter(Boolean).join(" ");
+
     return (
-      <>
-        <div style={{ display: preview === "card" ? "block" : "none" }}>
+      <div
+        className="flex items-center justify-center"
+        style={{ width: slotW, height: slotH }}
+      >
+        <div
+          data-fs-content
+          className={innerClass}
+          style={{ display: preview === "card" ? "block" : "none", ...ringStyle(cardRadius) }}
+          onClick={onClick}
+        >
           <StoryCard
             story={story}
             scale={scale}
@@ -157,7 +215,12 @@ export default function ChainFullscreen({
             chainTotal={total}
           />
         </div>
-        <div style={{ display: preview === "phone" ? "block" : "none" }}>
+        <div
+          data-fs-content
+          className={innerClass}
+          style={{ display: preview === "phone" ? "block" : "none", ...ringStyle(phoneRadius) }}
+          onClick={onClick}
+        >
           <PhonePreview
             story={story}
             scale={scale}
@@ -165,13 +228,13 @@ export default function ChainFullscreen({
             chainTotal={total}
           />
         </div>
-      </>
+      </div>
     );
   }
 
   return (
     <div
-      className={`fixed inset-0 z-50 bg-black/85 flex flex-col transition-opacity duration-200 ease-out ${
+      className={`fixed inset-0 z-[110] bg-black/85 flex flex-col transition-opacity duration-200 ease-out ${
         mounted && !closing ? "opacity-100" : "opacity-0"
       }`}
       role="dialog"
@@ -203,21 +266,25 @@ export default function ChainFullscreen({
         </button>
       </div>
 
-      {/* Items — side by side on desktop, vertical scroll on mobile. The outer
-          flex-1 wrapper deliberately has NO data-fs-content so its empty
-          gutters around the cards close the modal on click. */}
+      {/* Items + toggle as one centered group — wraps so the toggle sits
+          tight below the cards regardless of footer visibility. Empty
+          gutters around the group close the modal on click. */}
       <div
         ref={containerRef}
         className={
           isMobile
             ? "flex-1 overflow-y-auto flex flex-col items-center py-4"
-            : "flex-1 flex items-center justify-center"
+            : "flex-1 flex flex-col items-center justify-center"
         }
-        style={{ gap: isMobile ? 24 : GAP_DESKTOP * scale }}
+        style={{ gap: isMobile ? 24 : 16 }}
       >
+        {/* Slot wrappers carry no data-fs-content and no click/hover, so empty
+            space (in CARD mode the slot is bigger than the card) falls through
+            to backdrop-close. All interactive behavior lives on the inner
+            card/phone wrappers inside renderItem. */}
         {isMobile
           ? stories.map((story, i) => (
-              <div key={story.index} data-fs-card-idx={i} data-fs-content className="p-1.5">
+              <div key={story.index} data-fs-card-idx={i}>
                 {renderItem(story)}
               </div>
             ))
@@ -227,20 +294,17 @@ export default function ChainFullscreen({
               style={{ gap: GAP_DESKTOP * scale }}
             >
               {stories.map((story) => (
-                <div key={story.index} data-fs-content className="p-1.5">
-                  {renderItem(story)}
-                </div>
+                <div key={story.index}>{renderItem(story)}</div>
               ))}
             </div>
           )}
-      </div>
 
-      {/* CARD / PHONE toggle — under the items, above the action footer.
-          Only the pill itself is no-close; clicks on either side of it close. */}
-      <div
-        className="flex items-center justify-center shrink-0"
-        style={{ height: TOGGLE_H }}
-      >
+        {/* CARD / PHONE toggle — sits directly below the cards. Only the pill
+            itself is no-close; clicks on either side of it close. */}
+        <div
+          className="flex items-center justify-center"
+          style={{ height: TOGGLE_H }}
+        >
         <div data-fs-content className="flex gap-1 bg-surface rounded-lg p-1">
           <button
             type="button"
@@ -261,11 +325,15 @@ export default function ChainFullscreen({
             PHONE
           </button>
         </div>
+        </div>
       </div>
 
       {/* Footer — APPROVE ALL / REJECT ALL with inline status to the left.
+          Hidden in preview mode (opened from editor) since action surfaces
+          there are owned by the editor itself.
           Only the buttons and error text are no-close zones; empty areas of
           the footer row close. */}
+      {!isPreview && (
       <div
         className="flex items-center justify-center gap-4 px-6 shrink-0 relative"
         style={{ height: FOOTER_H }}
@@ -300,6 +368,7 @@ export default function ChainFullscreen({
           {status.kind === "busy" && status.action === "reject" ? "REJECTING…" : "REJECT ALL"}
         </button>
       </div>
+      )}
     </div>
   );
 }

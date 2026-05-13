@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from "react";
 import { Story, ApprovalState, PostedMap } from "@/types";
 import type { MarcoStoryMap } from "@/lib/marcoHandoff";
 import { apiFetch } from "@/lib/fetch";
@@ -87,7 +87,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
   const [showExport, setShowExport] = useState(false);
   const [showGenerateMore, setShowGenerateMore] = useState(false);
   const [fullscreenChain, setFullscreenChain] = useState<
-    | { chain: string; stories: Story[]; initialIndex: number }
+    | { chain: string; stories: Story[]; initialIndex: number; mode: "review" | "preview" }
     | null
   >(null);
   const isToday = date === todayRome();
@@ -363,6 +363,14 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
     ? stories
     : stories.filter((s) => s.division === divisionFilter);
 
+  // Stable identity for the editor's chain context — without memo, every
+  // StoryGrid render allocates a new array, cascading re-renders into the
+  // editor and re-running its chain-derivation IIFEs.
+  const editingChainStories = useMemo(
+    () => (editing?.chain ? stories.filter((s) => s.chain === editing.chain) : undefined),
+    [editing?.chain, stories],
+  );
+
   // Count stories per division for the filter pills
   const divisionCounts: Record<Division, number> = {
     All: stories.length,
@@ -380,6 +388,16 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
           marco={marco[editing.index]}
           onClose={() => setEditing(null)}
           onSaved={handleSaved}
+          chainStories={editingChainStories}
+          onNavigateChain={(next) => setEditing(next)}
+          onOpenChainFullscreen={editing.chain && editingChainStories?.length ? () => {
+            setFullscreenChain({
+              chain: editing.chain!,
+              stories: editingChainStories,
+              initialIndex: editing.index,
+              mode: "preview",
+            });
+          } : undefined}
         />
       )}
 
@@ -557,19 +575,22 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
                     </div>
                   )}
                   {!compliance.pass && (
-                    <div className="absolute bottom-2 left-2 right-2 group-hover/card:opacity-0 transition-opacity duration-150">
+                    <div className="absolute bottom-2 left-2 right-2 group-hover/card:opacity-0 group-hover/chain:opacity-0 transition-opacity duration-150">
                       <ComplianceBadge result={compliance} />
                     </div>
                   )}
 
-                  {/* Source link chip — top-right, hover-revealed (desktop only) */}
+                  {/* Source link chip — top-right, hover-revealed (desktop only).
+                      `group-hover/chain` fires for chain top cards too, since
+                      ChainStack's edge-chevron hover layer covers most of the
+                      card and would otherwise intercept the hover. */}
                   {marcoEntry?.url && (
                     <a
                       href={marcoEntry.url}
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      className="group/src hidden sm:flex absolute top-3 right-3 z-20 items-center justify-center w-7 h-7 rounded-full bg-black/70 backdrop-blur-sm border border-border-mid text-brand-white opacity-0 group-hover/card:opacity-100 transition-opacity duration-150 hover:bg-black/90 hover:border-border-light"
+                      className="group/src hidden sm:flex absolute top-3 right-3 z-20 items-center justify-center w-7 h-7 rounded-full bg-black/70 backdrop-blur-sm border border-border-mid text-brand-white opacity-0 group-hover/card:opacity-100 group-hover/chain:opacity-100 transition-opacity duration-150 hover:bg-black/90 hover:border-border-light"
                     >
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <path d="M14 4h6v6" />
@@ -588,7 +609,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
                   <div
                     data-stack-no-cycle
                     className={`hidden sm:flex absolute bottom-0 left-0 right-0 rounded-b-2xl px-5 pb-5 pt-16 bg-gradient-to-t from-black/90 to-transparent transition-opacity duration-150 gap-2 z-30 ${
-                      rejectingIndex === story.index ? "opacity-100 flex-col" : "opacity-0 group-hover/card:opacity-100"
+                      rejectingIndex === story.index ? "opacity-100 flex-col" : "opacity-0 group-hover/card:opacity-100 group-hover/chain:opacity-100"
                     }`}
                   >
                     {rejectingIndex === story.index ? (
@@ -787,7 +808,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
                   }}
                   renderActions={(s) => cardActions(s)}
                   onOpenFullscreen={(idx) =>
-                    setFullscreenChain({ chain: g.chain, stories: g.stories, initialIndex: idx })
+                    setFullscreenChain({ chain: g.chain, stories: g.stories, initialIndex: idx, mode: "review" })
                   }
                 />
               );
@@ -814,25 +835,32 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
           chain={fullscreenChain.chain}
           stories={fullscreenChain.stories}
           initialIndex={fullscreenChain.initialIndex}
+          mode={fullscreenChain.mode}
           onClose={() => setFullscreenChain(null)}
-          onApproveAll={async () => {
+          onApproveAll={fullscreenChain.mode === "review" ? async () => {
             const indexes = fullscreenChain.stories.map((s) => s.index);
             const res = await apiFetch(`/api/stories/${date}/chain/approve`, { indexes });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Failed to approve chain");
             if (data.approvals) setApprovals(data.approvals);
             setToast(`Approved chain "${fullscreenChain.chain}"`);
-            // ChainFullscreen owns the close timing so its exit animation
-            // can play before unmount.
-          }}
-          onRejectAll={async () => {
+          } : undefined}
+          onRejectAll={fullscreenChain.mode === "review" ? async () => {
             const indexes = fullscreenChain.stories.map((s) => s.index);
             const res = await apiFetch(`/api/stories/${date}/chain/reject`, { indexes });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Failed to reject chain");
             if (data.approvals) setApprovals(data.approvals);
             setToast(`Rejected chain "${fullscreenChain.chain}"`, "neutral");
-          }}
+          } : undefined}
+          onCardClick={fullscreenChain.mode === "preview" ? (clicked) => {
+            // Preview mode is layered over the editor. Swap the editor to the
+            // clicked card (different index → editor's prop-change effect
+            // does a clean reset), then close the fullscreen.
+            setEditing(clicked);
+            setFullscreenChain(null);
+          } : undefined}
+          currentIndex={fullscreenChain.mode === "preview" && editing ? editing.index : undefined}
         />
       )}
 

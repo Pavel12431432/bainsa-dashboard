@@ -14,10 +14,11 @@ export async function POST(
   const invalid = validateStoryParams(date, index);
   if (invalid) return invalid;
 
-  const { message, story, sessionId } = (await req.json()) as {
+  const { message, story, sessionId, chainSiblings } = (await req.json()) as {
     message: string;
     story: Story;
     sessionId: string;
+    chainSiblings?: Story[];
   };
 
   if (!message?.trim() || !sessionId) {
@@ -25,7 +26,7 @@ export async function POST(
   }
 
   const fullSessionId = `dashboard-${date}-${index}-${sessionId}`;
-  const userMessage = buildUserMessage(story, message);
+  const userMessage = buildUserMessage(story, message, chainSiblings);
 
   try {
     const content = await chatWithAgent("sofia", fullSessionId, userMessage, {
