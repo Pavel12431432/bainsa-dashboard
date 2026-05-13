@@ -24,11 +24,13 @@ function accentSrc(type: ">" | "+"): string {
 function TintedAccent({ src, color, style }: { src: string; color: string; style?: React.CSSProperties }) {
   const [url, setUrl] = useState<string | undefined>(() => getTintedDataUrlSync(src, color));
   useEffect(() => {
-    if (url) return;
+    const sync = getTintedDataUrlSync(src, color);
+    if (sync) { setUrl(sync); return; }
+    setUrl(undefined);
     let cancelled = false;
     tintedDataUrl(src, color).then((u) => { if (!cancelled) setUrl(u); });
     return () => { cancelled = true; };
-  }, [src, color, url]);
+  }, [src, color]);
   // eslint-disable-next-line @next/next/no-img-element
   return <img src={url ?? src} alt="" draggable={false} style={{ objectFit: "contain", visibility: url ? "visible" : "hidden", ...style }} />;
 }
