@@ -1,10 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Story, PostedMap, PostRecord } from "@/types";
 import { captureStories, captureStoryToBlob } from "@/lib/exportCards";
 import { apiFetch } from "@/lib/fetch";
 import { useOverlayClose } from "@/lib/useOverlayClose";
+import { checkCompliance } from "@/lib/compliance";
+
+type RenderRow =
+  | { kind: "single"; story: Story }
+  | { kind: "chain"; chain: string; stories: Story[] };
+
+function groupStories(stories: Story[]): RenderRow[] {
+  const rows: RenderRow[] = [];
+  for (const story of stories) {
+    if (story.chain) {
+      const last = rows[rows.length - 1];
+      if (last && last.kind === "chain" && last.chain === story.chain) {
+        last.stories.push(story);
+        continue;
+      }
+      rows.push({ kind: "chain", chain: story.chain, stories: [story] });
+    } else {
+      rows.push({ kind: "single", story });
+    }
+  }
+  return rows;
+}
 
 interface Props {
   stories: Story[];
@@ -37,6 +59,66 @@ function loadPrefs(): Prefs {
   } catch {
     return DEFAULT_PREFS;
   }
+}
+
+function StoryRow({
+  story, selected, onToggle, isStale, posted, failsCompliance,
+}: {
+  story: Story;
+  selected: boolean;
+  onToggle: () => void;
+  isStale: boolean;
+  posted: PostRecord[] | undefined;
+  failsCompliance: boolean;
+}) {
+  const postedCount = posted?.length ?? 0;
+  return (
+    <div
+      onClick={onToggle}
+      className="flex items-center gap-3 py-2.5 cursor-pointer group"
+    >
+      <span
+        className={`w-3.5 h-3.5 rounded-sm border shrink-0 flex items-center justify-center ${
+          selected ? "bg-border-mid border-border-mid" : "bg-transparent border-[#444]"
+        }`}
+      >
+        {selected && (
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2.5 2.5L8 3" stroke="#999" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        )}
+      </span>
+      <span className="flex-1 text-[0.8rem] text-brand-white opacity-60 group-hover:opacity-90 transition-opacity leading-tight">
+        {story.index}. {story.headline}
+      </span>
+      {failsCompliance && (
+        <span
+          className="text-[0.55rem] font-semibold tracking-[0.06em] px-1.5 py-0.5 rounded border border-danger/40 text-danger shrink-0"
+          title="One or more compliance checks failed"
+        >
+          INVALID
+        </span>
+      )}
+      {isStale && (
+        <span
+          className="text-[0.55rem] font-semibold tracking-[0.06em] px-1.5 py-0.5 rounded border border-amber-500/40 text-amber-400 shrink-0"
+          title="Approved version differs from current — re-approve to clear"
+        >
+          EDITED
+        </span>
+      )}
+      {postedCount > 0 && (
+        <span
+          className="text-[0.55rem] font-semibold tracking-[0.06em] px-1.5 py-0.5 rounded border border-amber-500/40 text-amber-400 shrink-0"
+          title={`Posted ${postedCount}× to Instagram`}
+        >
+          POSTED{postedCount > 1 ? ` ×${postedCount}` : ""}
+        </span>
+      )}
+      <span
+        className="w-2.5 h-2.5 rounded-full shrink-0"
+        style={{ background: story.accentColor }}
+      />
+    </div>
+  );
 }
 
 function WarningCallout({ title, items, singular, plural }: {
@@ -114,6 +196,45 @@ export default function ExportDialog({ stories, approvedIndices = [], stale = []
   function selectAll() { setSelected(new Set(stories.map((s) => s.index))); }
   function deselectAll() { setSelected(new Set()); }
 
+  const rows = useMemo(() => groupStories(stories), [stories]);
+
+  function chainSelectionState(chainStories: Story[]): "all" | "partial" | "none" {
+    let selectedCount = 0;
+    for (const s of chainStories) if (selected.has(s.index)) selectedCount++;
+    if (selectedCount === 0) return "none";
+    if (selectedCount === chainStories.length) return "all";
+    return "partial";
+  }
+
+  function toggleChain(chainStories: Story[]) {
+    const state = chainSelectionState(chainStories);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (state === "all") {
+        for (const s of chainStories) next.delete(s.index);
+      } else {
+        for (const s of chainStories) next.add(s.index);
+      }
+      return next;
+    });
+  }
+
+  // Compliance is per-story; the dialog surfaces failures both inline (a
+  // small chip next to the title) and as a callout when posting. Sticky
+  // memo keyed on stories — failure set only changes when stories change.
+  const failingCompliance = useMemo(() => {
+    const set = new Set<number>();
+    for (const s of stories) if (!checkCompliance(s).pass) set.add(s.index);
+    return set;
+  }, [stories]);
+  const failsCompliance = (index: number) => failingCompliance.has(index);
+
+  // Chains where some-but-not-all members are selected — flagged in the IG
+  // confirm overlay as PARTIAL CHAIN POST.
+  const partialChains = rows.flatMap((r) =>
+    r.kind === "chain" && chainSelectionState(r.stories) === "partial" ? [r] : [],
+  );
+
   async function handleDownload() {
     const toExport = stories.filter((s) => selected.has(s.index));
     if (toExport.length === 0) return;
@@ -138,7 +259,18 @@ export default function ExportDialog({ stories, approvedIndices = [], stale = []
   }
 
   async function handleInstagram() {
-    const toPost = stories.filter((s) => selected.has(s.index));
+    // Defensive: within each chain, force role order (hook → develop → closer)
+    // regardless of selection order or markdown order. Singletons keep file
+    // order.
+    const roleOrder: Record<string, number> = { hook: 0, develop: 1, closer: 2 };
+    const toPost = stories
+      .filter((s) => selected.has(s.index))
+      .sort((a, b) => {
+        if (a.chain && b.chain && a.chain === b.chain) {
+          return (roleOrder[a.chainRole ?? ""] ?? 99) - (roleOrder[b.chainRole ?? ""] ?? 99);
+        }
+        return 0;
+      });
     if (toPost.length === 0) return;
 
     setConfirmingIg(false);
@@ -241,48 +373,70 @@ export default function ExportDialog({ stories, approvedIndices = [], stale = []
         </div>
 
         <div className="px-6 pt-4 pb-2 max-h-[40vh] overflow-y-auto">
-          {stories.map((story) => (
-            <label
-              key={story.index}
-              className="flex items-center gap-3 py-2.5 cursor-pointer group"
-            >
-              <span
-                onClick={() => toggle(story.index)}
-                className={`w-3.5 h-3.5 rounded-sm border shrink-0 cursor-pointer flex items-center justify-center ${
-                  selected.has(story.index)
-                    ? "bg-border-mid border-border-mid"
-                    : "bg-transparent border-[#444]"
-                }`}
-              >
-                {selected.has(story.index) && (
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2.5 2.5L8 3" stroke="#999" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                )}
-              </span>
-              <span className="flex-1 text-[0.8rem] text-brand-white opacity-60 group-hover:opacity-90 transition-opacity leading-tight">
-                {story.index}. {story.headline}
-              </span>
-              {isStale(story.index) && (
-                <span
-                  className="text-[0.55rem] font-semibold tracking-[0.06em] px-1.5 py-0.5 rounded border border-amber-500/40 text-amber-400 shrink-0"
-                  title="Approved version differs from current — re-approve to clear"
+          {rows.map((row) => {
+            if (row.kind === "single") {
+              return (
+                <StoryRow
+                  key={row.story.index}
+                  story={row.story}
+                  selected={selected.has(row.story.index)}
+                  onToggle={() => toggle(row.story.index)}
+                  isStale={isStale(row.story.index)}
+                  posted={posted[row.story.index]}
+                  failsCompliance={failsCompliance(row.story.index)}
+                />
+              );
+            }
+            const state = chainSelectionState(row.stories);
+            return (
+              <div key={`chain-${row.chain}-${row.stories[0].index}`}>
+                <div
+                  onClick={() => toggleChain(row.stories)}
+                  className="flex items-center gap-3 py-2.5 cursor-pointer group"
                 >
-                  EDITED
-                </span>
-              )}
-              {hasPosted(story.index) && (
-                <span
-                  className="text-[0.55rem] font-semibold tracking-[0.06em] px-1.5 py-0.5 rounded border border-amber-500/40 text-amber-400 shrink-0"
-                  title={`Posted ${posted[story.index]!.length}× to Instagram`}
-                >
-                  POSTED{posted[story.index]!.length > 1 ? ` ×${posted[story.index]!.length}` : ""}
-                </span>
-              )}
-              <span
-                className="w-2.5 h-2.5 rounded-full shrink-0"
-                style={{ background: story.accentColor }}
-              />
-            </label>
-          ))}
+                  <span
+                    className={`w-3.5 h-3.5 rounded-sm border shrink-0 flex items-center justify-center ${
+                      state === "all"
+                        ? "bg-border-mid border-border-mid"
+                        : state === "partial"
+                          ? "bg-transparent border-border-mid"
+                          : "bg-transparent border-[#444]"
+                    }`}
+                  >
+                    {state === "all" && (
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2.5 2.5L8 3" stroke="#999" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    )}
+                    {state === "partial" && (
+                      <span className="w-1.5 h-1.5 bg-[#999] rounded-[1px]" />
+                    )}
+                  </span>
+                  <span className="flex-1 text-[0.7rem] uppercase tracking-[0.06em] text-brand-white opacity-75 group-hover:opacity-100 transition-opacity font-semibold">
+                    {row.chain}
+                  </span>
+                  <span className="text-[0.55rem] tabular-nums text-muted shrink-0">
+                    {row.stories.length} cards
+                  </span>
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ background: row.stories[0].accentColor }}
+                  />
+                </div>
+                <div className="border-l border-border ml-[7px] pl-4">
+                  {row.stories.map((story) => (
+                    <StoryRow
+                      key={story.index}
+                      story={story}
+                      selected={selected.has(story.index)}
+                      onToggle={() => toggle(story.index)}
+                      isStale={isStale(story.index)}
+                      posted={posted[story.index]}
+                      failsCompliance={failsCompliance(story.index)}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <div className="px-6 pb-3 flex gap-3">
@@ -302,7 +456,16 @@ export default function ExportDialog({ stories, approvedIndices = [], stale = []
           )}
         </div>
 
-        <div className="px-6 pb-4">
+        <div className="px-6">
+          <WarningCallout
+            title="COMPLIANCE FAILURES"
+            items={stories.filter((s) => selected.has(s.index) && failsCompliance(s.index))}
+            singular="This story has failing compliance checks (color, headline length, body length, or source). Open the editor to fix it."
+            plural={(n) => `${n} of these stories have failing compliance checks. Open the editor to fix them.`}
+          />
+        </div>
+
+        <div className="px-6 pb-4 pt-4">
           <p className="text-[0.65rem] text-brand-white opacity-35 mb-2 font-semibold tracking-[0.04em]">DESTINATION</p>
           <div className="flex gap-2">
             <button onClick={() => setDestination("instagram")} className={tabBtn(destination === "instagram")}>INSTAGRAM</button>
@@ -418,11 +581,37 @@ export default function ExportDialog({ stories, approvedIndices = [], stale = []
                 )}.
               </p>
               <WarningCallout
+                title="COMPLIANCE FAILURES"
+                items={stories.filter((s) => selected.has(s.index) && failsCompliance(s.index))}
+                singular="This story has failing compliance checks. Posting will publish broken content — fix it in the editor first."
+                plural={(n) => `${n} of these stories have failing compliance checks. Posting will publish broken content — fix them in the editor first.`}
+              />
+              <WarningCallout
                 title="RE-APPROVE BEFORE POSTING"
                 items={stories.filter((s) => selected.has(s.index) && isStale(s.index))}
                 singular="This story changed after it was approved. Re-approve it before posting."
                 plural={(n) => `${n} of these stories changed after they were approved. Re-approve them before posting.`}
               />
+              {partialChains.length > 0 && (
+                <div className="mt-4 p-3 rounded-md border border-amber-500/40 bg-amber-500/10">
+                  <p className="text-[0.7rem] font-semibold text-amber-400 m-0 mb-1.5 tracking-[0.04em]">PARTIAL CHAIN POST</p>
+                  <p className="text-[0.7rem] text-amber-200/80 leading-snug m-0 mb-1.5">
+                    {partialChains.length === 1
+                      ? "You're posting only part of a chain. Followers will see an incomplete sequence."
+                      : `You're posting only part of ${partialChains.length} chains. Followers will see incomplete sequences.`}
+                  </p>
+                  <ul className="m-0 pl-4 text-[0.7rem] text-amber-200/70 leading-snug list-disc">
+                    {partialChains.map((c) => {
+                      const sel = c.stories.filter((s) => selected.has(s.index)).length;
+                      return (
+                        <li key={c.chain}>
+                          <span className="opacity-80">{c.chain}</span> — {sel}/{c.stories.length} selected
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
               <WarningCallout
                 title="ALREADY POSTED"
                 items={stories.filter((s) => selected.has(s.index) && hasPosted(s.index))}
