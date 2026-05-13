@@ -6,6 +6,8 @@ import StoryContent from "./StoryContent";
 interface Props {
   story: Story;
   scale?: number;
+  chainPosition?: number;
+  chainTotal?: number;
 }
 
 const SCREEN_W = 405;
@@ -13,7 +15,7 @@ const SCREEN_H = 880;
 const STORY_TOP = 54;
 const STORY_H = 720;
 
-export default function PhonePreview({ story, scale = 1 }: Props) {
+export default function PhonePreview({ story, scale = 1, chainPosition, chainTotal }: Props) {
   return (
     <div
       className="relative shrink-0"
@@ -43,7 +45,7 @@ export default function PhonePreview({ story, scale = 1 }: Props) {
             className="absolute left-0"
             style={{ top: STORY_TOP, width: SCREEN_W, height: STORY_H }}
           >
-            <StoryContent story={story} />
+            <StoryContent story={story} chainPosition={chainPosition} chainTotal={chainTotal} />
           </div>
 
           {/* Layer 2: Top chrome (real iOS status bar) */}

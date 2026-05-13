@@ -141,7 +141,15 @@ function BodyContent({ story }: { story: Story }) {
   );
 }
 
-export default function StoryContent({ story }: { story: Story }) {
+interface StoryContentProps {
+  story: Story;
+  /** Position of this card within its chain (1-based). Pair with chainTotal. */
+  chainPosition?: number;
+  /** Total cards in the chain this card belongs to. Pair with chainPosition. */
+  chainTotal?: number;
+}
+
+export default function StoryContent({ story, chainPosition, chainTotal }: StoryContentProps) {
   const { accentColor, headline, sourceTag, cornerAccent, layout, headlineSize, cornerSize, accentBar, ghostAccent } = story;
 
   const headlineFontSize = HEADLINE_SIZE[headlineSize] || HEADLINE_SIZE.default;
@@ -149,6 +157,13 @@ export default function StoryContent({ story }: { story: Story }) {
 
   const isCenter = layout === "center";
   const isBottom = layout === "bottom";
+
+  // Chain indicator: shown only when this card is part of a chain AND the
+  // parent provided position/total context. Both story fields are present
+  // together (both-or-neither invariant in parseStories), so testing chain
+  // alone is sufficient.
+  const showChainBadge =
+    !!story.chain && chainPosition !== undefined && chainTotal !== undefined;
 
   return (
     <div className="story-content">
@@ -165,10 +180,41 @@ export default function StoryContent({ story }: { story: Story }) {
         <GhostAccentElement type={cornerAccent} color={accentColor} position={ghostAccent} />
       )}
 
-      {/* Header row — pushed down to clear IG chrome overlay */}
-      <div className="flex items-center justify-between pt-5" style={{ position: "relative", zIndex: 2 }}>
-        <img src="/bainsa-logo.png" alt="BAINSA" className="block" style={{ height: "1.5rem" }} draggable={false} />
-        <CornerIcon type={cornerAccent} color={accentColor} size={iconSize} />
+      {/* Header row — 3-column grid so the chain badge sits at true card center,
+          not the gap between logo and corner accent. Logo left, badge center,
+          accent right. Same row height whether badge is present or not. */}
+      <div
+        className="grid items-center pt-5"
+        style={{ gridTemplateColumns: "1fr auto 1fr", position: "relative", zIndex: 2 }}
+      >
+        <img
+          src="/bainsa-logo.png"
+          alt="BAINSA"
+          className="block justify-self-start"
+          style={{ height: "1.5rem" }}
+          draggable={false}
+        />
+        {showChainBadge ? (
+          <span className="justify-self-center flex items-center" style={{ gap: 5 }}>
+            {Array.from({ length: chainTotal! }).map((_, i) => (
+              <span
+                key={i}
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: accentColor,
+                  opacity: i + 1 === chainPosition ? 1 : 0.28,
+                }}
+              />
+            ))}
+          </span>
+        ) : (
+          <span />
+        )}
+        <div className="justify-self-end">
+          <CornerIcon type={cornerAccent} color={accentColor} size={iconSize} />
+        </div>
       </div>
 
       {/* Top spacer */}

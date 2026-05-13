@@ -7,9 +7,11 @@ import StoryContent from "./StoryContent";
 interface Props {
   story: Story;
   scale?: number; // explicit scale for editor preview; omit for auto-scaling (no CLS)
+  chainPosition?: number;
+  chainTotal?: number;
 }
 
-export default function StoryCard({ story, scale }: Props) {
+export default function StoryCard({ story, scale, chainPosition, chainTotal }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
 
@@ -46,7 +48,7 @@ export default function StoryCard({ story, scale }: Props) {
           className="absolute top-0 left-0"
           style={{ width: 405, height: 720, transform: `scale(${scale})`, transformOrigin: "top left" }}
         >
-          <StoryContent story={story} />
+          <StoryContent story={story} chainPosition={chainPosition} chainTotal={chainTotal} />
         </div>
       </div>
     );
@@ -68,7 +70,7 @@ export default function StoryCard({ story, scale }: Props) {
         className="absolute top-0 left-0 opacity-0"
         style={{ width: 405, height: 720, transformOrigin: "top left" }}
       >
-        <StoryContent story={story} />
+        <StoryContent story={story} chainPosition={chainPosition} chainTotal={chainTotal} />
       </div>
     </div>
   );
