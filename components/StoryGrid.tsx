@@ -22,6 +22,7 @@ import StoryEditor from "./StoryEditor";
 import ExportDialog from "./ExportDialog";
 import GenerateMoreDialog from "./GenerateMoreDialog";
 import ChainStack, { type ChainDot, type ChainDotState } from "./ChainStack";
+import ChainFullscreen from "./ChainFullscreen";
 import { todayRome } from "@/lib/date";
 
 // A render group is either a single story or a contiguous run of same-chain stories.
@@ -85,12 +86,19 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
   const [editing, setEditing] = useState<Story | null>(null);
   const [showExport, setShowExport] = useState(false);
   const [showGenerateMore, setShowGenerateMore] = useState(false);
+  const [fullscreenChain, setFullscreenChain] = useState<
+    | { chain: string; stories: Story[]; initialIndex: number }
+    | null
+  >(null);
   const isToday = date === todayRome();
-  const [toast, setToast] = useState<string>("");
+  const [toast, setToastState] = useState<{ message: string; kind: "success" | "neutral" | "danger" } | null>(null);
+  const setToast = useCallback((message: string, kind: "success" | "neutral" | "danger" = "success") => {
+    setToastState(message ? { message, kind } : null);
+  }, []);
 
   useEffect(() => {
     if (!toast) return;
-    const id = setTimeout(() => setToast(""), 4000);
+    const id = setTimeout(() => setToastState(null), 4000);
     return () => clearTimeout(id);
   }, [toast]);
   const [stale, setStale] = useState<string | null>(null); // Marco's lastRun if stale
@@ -779,7 +787,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
                   }}
                   renderActions={(s) => cardActions(s)}
                   onOpenFullscreen={(idx) =>
-                    setToast(`[chain "${g.chain}" #${idx}] fullscreen wired in phase 6`)
+                    setFullscreenChain({ chain: g.chain, stories: g.stories, initialIndex: idx })
                   }
                 />
               );
@@ -801,6 +809,33 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
 
       {showGenerateMore && <GenerateMoreDialog date={date} onClose={() => setShowGenerateMore(false)} />}
 
+      {fullscreenChain && (
+        <ChainFullscreen
+          chain={fullscreenChain.chain}
+          stories={fullscreenChain.stories}
+          initialIndex={fullscreenChain.initialIndex}
+          onClose={() => setFullscreenChain(null)}
+          onApproveAll={async () => {
+            const indexes = fullscreenChain.stories.map((s) => s.index);
+            const res = await apiFetch(`/api/stories/${date}/chain/approve`, { indexes });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed to approve chain");
+            if (data.approvals) setApprovals(data.approvals);
+            setToast(`Approved chain "${fullscreenChain.chain}"`);
+            // ChainFullscreen owns the close timing so its exit animation
+            // can play before unmount.
+          }}
+          onRejectAll={async () => {
+            const indexes = fullscreenChain.stories.map((s) => s.index);
+            const res = await apiFetch(`/api/stories/${date}/chain/reject`, { indexes });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed to reject chain");
+            if (data.approvals) setApprovals(data.approvals);
+            setToast(`Rejected chain "${fullscreenChain.chain}"`, "neutral");
+          }}
+        />
+      )}
+
       {showExport && (
         <ExportDialog
           stories={stories}
@@ -815,11 +850,20 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
       )}
 
       {toast && (
-        <div className="toast-in fixed bottom-6 inset-x-0 mx-auto w-fit z-[200] px-4 py-3 rounded-lg border border-success/40 bg-surface-2/95 backdrop-blur shadow-lg flex items-center gap-2">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0">
-            <path d="M3 7l3 3 5-6" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <p className="text-[0.75rem] text-brand-white leading-snug">{toast}</p>
+        <div className={`toast-in fixed bottom-6 inset-x-0 mx-auto w-fit z-[200] px-4 py-3 rounded-lg border bg-surface-2/95 backdrop-blur shadow-lg flex items-center gap-2 ${
+          toast.kind === "danger" ? "border-danger/40" : toast.kind === "neutral" ? "border-border-mid" : "border-success/40"
+        }`}>
+          {toast.kind === "danger" ? (
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0">
+              <line x1="3" y1="3" x2="11" y2="11" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" />
+              <line x1="11" y1="3" x2="3" y2="11" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          ) : toast.kind === "success" ? (
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0">
+              <path d="M3 7l3 3 5-6" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          ) : null}
+          <p className="text-[0.75rem] text-brand-white leading-snug">{toast.message}</p>
         </div>
       )}
     </>

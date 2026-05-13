@@ -179,7 +179,7 @@ export default function ChainStack({
             onClick={(e) => { e.stopPropagation(); onOpenFullscreen(topStory.index); }}
             aria-label={`Open chain "${chain}" in fullscreen`}
             data-stack-no-cycle
-            className="absolute opacity-0 hover:opacity-100 transition-opacity duration-150 pointer-events-auto cursor-zoom-in"
+            className="absolute opacity-0 hover:opacity-100 transition-opacity duration-150 pointer-events-auto cursor-pointer"
             style={{
               left: total > 1 ? EDGE_ZONE_WIDTH : 0,
               right: total > 1 ? EDGE_ZONE_WIDTH : 0,
