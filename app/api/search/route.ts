@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
 
     for (const story of stories) {
       if (results.length >= 20) break;
-      const haystack = `${story.headline} ${story.body} ${story.sourceTag}`.toLowerCase();
+      const haystack = `${story.headline} ${story.body} ${story.sourceTag} ${story.chain ?? ""}`.toLowerCase();
       if (haystack.includes(q)) {
         results.push({ date, index: story.index, headline: story.headline });
       }
