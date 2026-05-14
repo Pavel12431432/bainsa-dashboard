@@ -7,13 +7,18 @@ import { readHistory } from "@/lib/history";
 import { readVariants, Variant } from "@/lib/variants";
 import { readInstructionHistory, InstructionHistoryEntry } from "@/lib/instructionHistory";
 import { diffFields } from "@/lib/storyUtils";
-import { Story } from "@/types";
+import { ChainRole, Story } from "@/types";
 
 const DATE_RE = /^(\d{4}-\d{2}-\d{2})\.md$/;
 
+// `chain` / `chainRole` are mirrored at signal-level (alongside the nested
+// Story) so they're prominent in the serialized bundle Lorenzo sees. Without
+// the lift, chain context is buried inside the Story object and easy to miss.
 export interface RejectionSignal {
   date: string;
   storyIndex: number;
+  chain?: string;
+  chainRole?: ChainRole;
   story: Story;
   reason: string;
 }
@@ -21,6 +26,8 @@ export interface RejectionSignal {
 export interface EditSignal {
   date: string;
   storyIndex: number;
+  chain?: string;
+  chainRole?: ChainRole;
   original: Story;
   final: Story;
   changedFields: string[];
@@ -29,6 +36,8 @@ export interface EditSignal {
 export interface VariantActivitySignal {
   date: string;
   storyIndex: number;
+  chain?: string;
+  chainRole?: ChainRole;
   applied: Variant[];
   disliked: Variant[];
 }
@@ -36,6 +45,8 @@ export interface VariantActivitySignal {
 export interface ApprovalSignal {
   date: string;
   storyIndex: number;
+  chain?: string;
+  chainRole?: ChainRole;
   story: Story;
 }
 
@@ -144,12 +155,12 @@ export async function collectFeedback(windowDays: number): Promise<FeedbackBundl
       const story = byIndex.get(idx);
       if (!story) continue;
       const reason = approvalState.feedback?.[idx] ?? "";
-      rejections.push({ date, storyIndex: idx, story, reason });
+      rejections.push({ date, storyIndex: idx, chain: story.chain, chainRole: story.chainRole, story, reason });
     }
     for (const idx of approvalState.approved) {
       const story = byIndex.get(idx);
       if (!story) continue;
-      approvals.push({ date, storyIndex: idx, story });
+      approvals.push({ date, storyIndex: idx, chain: story.chain, chainRole: story.chainRole, story });
     }
 
     for (const story of stories) {
@@ -162,6 +173,8 @@ export async function collectFeedback(windowDays: number): Promise<FeedbackBundl
       edits.push({
         date,
         storyIndex: story.index,
+        chain: final.chain,
+        chainRole: final.chainRole,
         original,
         final,
         changedFields: changed,
@@ -173,7 +186,7 @@ export async function collectFeedback(windowDays: number): Promise<FeedbackBundl
       const applied = variants.filter((v) => v.appliedAt);
       const disliked = variants.filter((v) => v.dislikedAt);
       if (!applied.length && !disliked.length) continue;
-      variantActivity.push({ date, storyIndex: story.index, applied, disliked });
+      variantActivity.push({ date, storyIndex: story.index, chain: story.chain, chainRole: story.chainRole, applied, disliked });
     }
   }
 
