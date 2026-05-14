@@ -21,19 +21,20 @@ interface Props {
 const COUNTS = [1, 3, 5] as const;
 const FOCUS_MAX = 300;
 
-interface Prefs { count: number; focus: string; }
+interface Prefs { count: number; focus: string; suggestChain: boolean; }
 
 function loadPrefs(): Prefs {
-  if (typeof window === "undefined") return { count: 3, focus: "" };
+  if (typeof window === "undefined") return { count: 3, focus: "", suggestChain: false };
   try {
     const raw = localStorage.getItem(GENERATE_MORE_PREFS_KEY);
-    if (!raw) return { count: 3, focus: "" };
+    if (!raw) return { count: 3, focus: "", suggestChain: false };
     const parsed = JSON.parse(raw) as Partial<Prefs>;
     const validCount = (COUNTS as readonly number[]).includes(parsed.count as number) ? (parsed.count as number) : 3;
     const validFocus = typeof parsed.focus === "string" ? parsed.focus.slice(0, FOCUS_MAX) : "";
-    return { count: validCount, focus: validFocus };
+    const validSuggestChain = parsed.suggestChain === true;
+    return { count: validCount, focus: validFocus, suggestChain: validSuggestChain };
   } catch {
-    return { count: 3, focus: "" };
+    return { count: 3, focus: "", suggestChain: false };
   }
 }
 
@@ -47,6 +48,7 @@ export default function GenerateMoreDialog({ date, onClose }: Props) {
 
   const [count, setCount] = useState<number>(() => loadPrefs().count);
   const [focus, setFocus] = useState<string>(() => loadPrefs().focus);
+  const [suggestChain, setSuggestChain] = useState<boolean>(() => loadPrefs().suggestChain);
   const focusRef = useRef<HTMLTextAreaElement | null>(null);
   const wasRunningRef = useRef(running);
 
@@ -60,9 +62,9 @@ export default function GenerateMoreDialog({ date, onClose }: Props) {
   // Persist form prefs on change
   useEffect(() => {
     try {
-      localStorage.setItem(GENERATE_MORE_PREFS_KEY, JSON.stringify({ count, focus }));
+      localStorage.setItem(GENERATE_MORE_PREFS_KEY, JSON.stringify({ count, focus, suggestChain }));
     } catch {}
-  }, [count, focus]);
+  }, [count, focus, suggestChain]);
 
   useEffect(() => {
     if (running) return;
@@ -76,7 +78,7 @@ export default function GenerateMoreDialog({ date, onClose }: Props) {
   function submit() {
     if (running) return;
     clearGenerateMoreError(date);
-    runGenerateMore(date, count, focus.trim());
+    runGenerateMore(date, count, focus.trim(), suggestChain);
   }
 
   const progressLabel =
@@ -140,6 +142,20 @@ export default function GenerateMoreDialog({ date, onClose }: Props) {
               Marco will research first, then Sofia will write.
             </span>
           </div>
+
+          <label className={`flex items-start gap-2.5 cursor-pointer select-none ${running ? "opacity-50 cursor-not-allowed" : ""}`}>
+            <input
+              type="checkbox"
+              checked={suggestChain}
+              onChange={(e) => setSuggestChain(e.target.checked)}
+              disabled={running}
+              className="mt-0.5 w-3.5 h-3.5 accent-brand-white cursor-pointer disabled:cursor-not-allowed"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="text-[0.7rem] font-semibold text-brand-white tracking-[0.04em]">Suggest a chain if appropriate</span>
+              <span className="text-[0.65rem] text-muted leading-snug">Sofia may group the new items as a chain when the topic warrants it. Off by default — chains shouldn&apos;t be forced.</span>
+            </span>
+          </label>
 
           {error && (
             <div className="flex items-start gap-2 px-3 py-2.5 rounded-md border border-danger/40 bg-danger/10">

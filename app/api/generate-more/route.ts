@@ -22,11 +22,12 @@ export async function POST(req: NextRequest) {
   if (!isValidDate(date)) return new Response("Invalid date", { status: 400 });
   if (date !== todayRome()) return new Response("Can only generate stories for today", { status: 400 });
 
-  const { count, focus } = await req.json().catch(() => ({}));
+  const { count, focus, suggestChain } = await req.json().catch(() => ({}));
   if (typeof count !== "number" || !ALLOWED_COUNTS.has(count)) {
     return new Response("Invalid count", { status: 400 });
   }
   const focusText = typeof focus === "string" ? focus.slice(0, FOCUS_MAX).trim() : "";
+  const suggestChainFlag = suggestChain === true;
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -118,7 +119,7 @@ export async function POST(req: NextRequest) {
 
         // PHASE 2 — Sofia writes stories for the new items only (response-only, no file write)
         send("phase", "sofia");
-        const sofiaPrompt = buildSofiaPrompt(newSections);
+        const sofiaPrompt = buildSofiaPrompt(newSections, suggestChainFlag);
         const sofiaReply = await chatWithAgent("sofia", `${sessionId}-sofia`, sofiaPrompt, {
           mode: "generate-more",
           date,
@@ -200,19 +201,25 @@ function buildMarcoPrompt(date: string, count: number, focus: string, handoffExi
   const action = handoffExists
     ? `APPEND exactly ${count} more stories to today's handoff at handoffs/${date}.md. Do NOT overwrite existing stories — add new ones underneath. Do NOT ask whether to overwrite or append; the answer is APPEND.`
     : `Write today's handoff at handoffs/${date}.md with exactly ${count} stories.`;
+  const chainGuard = handoffExists
+    ? `\n\nChain lock: you may NOT modify, extend, or split any existing chain in today's handoff. Stories already marked as part of a chain are off-limits. New items you add must be either standalones or members of a NEW chain.`
+    : "";
   return `${action}
 
 ${focusLine}
 
-Critical: do NOT repeat any story already in today's handoff or any handoff in the last 7 days. Each new item must be genuinely fresh.
+Critical: do NOT repeat any story already in today's handoff or any handoff in the last 7 days. Each new item must be genuinely fresh.${chainGuard}
 
 Follow your usual handoff format and verification rules in full. Reply with a brief summary of what you added.`;
 }
 
-function buildSofiaPrompt(newSections: string[]): string {
+function buildSofiaPrompt(newSections: string[], suggestChain: boolean): string {
+  const chainLine = suggestChain
+    ? `\n\nIf the new stories you're adding share a topic that benefits from a chain, group them as a chain per your chain rules. Don't force a chain if the topic doesn't warrant it.`
+    : "";
   return `Generate Instagram story cards for ONLY the news items below — no others. Use exactly one story per item, in the same order.
 
-Output ONLY the markdown stories using your standard format. Do NOT save to disk. Do NOT read any handoff file. Do NOT include any commentary outside the markdown. Number them starting from 1 (## Story 1, ## Story 2, …) — the dashboard will reassign indexes when appending.
+Output ONLY the markdown stories using your standard format. Do NOT save to disk. Do NOT read any handoff file. Do NOT include any commentary outside the markdown. Number them starting from 1 (## Story 1, ## Story 2, …) — the dashboard will reassign indexes when appending.${chainLine}
 
 News items:
 
