@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
           ok: true,
           durationMs: Date.now() - start,
           summary: `Generated ${appended.length} more stories`,
-          meta: { date, count, focus: focusText, appendedIndexes: appended.map((s) => s.index) },
+          meta: { date, count, focus: focusText, suggestChain: suggestChainFlag, appendedIndexes: appended.map((s) => s.index) },
         });
 
         send("done", JSON.stringify({ count: appended.length, indexes: appended.map((s) => s.index) }));
