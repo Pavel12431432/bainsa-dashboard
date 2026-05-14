@@ -15,6 +15,8 @@ export type LogKind =
   | "adaptive.save"
   | "story.approve"
   | "story.reject"
+  | "story.chain-approve"
+  | "story.chain-reject"
   | "story.edit"
   | "variants.generate"
   | "story.generate-more"

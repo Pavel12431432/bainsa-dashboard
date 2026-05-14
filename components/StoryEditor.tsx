@@ -33,6 +33,17 @@ interface Props {
   marco?: MarcoStory;
   onClose: () => void;
   onSaved: (updated: Story) => void;
+  /** Full chain (hook → develop → closer, in narrative order) when the story
+      being edited is part of one. Used to render prev/next chevrons, the
+      breadcrumb, the chain indicator dots, and to thread sibling context
+      into Sofia's prompt. Omit for standalones. */
+  chainStories?: Story[];
+  /** Open a different chain card in the editor. Parent should update the
+      `story` prop. Editor saves the dirty draft first before calling this. */
+  onNavigateChain?: (next: Story) => void;
+  /** Open the chain-fullscreen preview for the current chain. Available only
+      when the story is part of a chain. Editor saves the dirty draft first. */
+  onOpenChainFullscreen?: () => void;
 }
 
 // What Sofia proposed but hasn't been accepted/reverted yet
@@ -54,7 +65,7 @@ function getSessionId(date: string, index: number): string {
   return id;
 }
 
-export default function StoryEditor({ story, date, marco, onClose, onSaved }: Props) {
+export default function StoryEditor({ story, date, marco, onClose, onSaved, chainStories, onNavigateChain, onOpenChainFullscreen }: Props) {
   const [draft, setDraft] = useState<Story>({ ...story });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -101,12 +112,25 @@ export default function StoryEditor({ story, date, marco, onClose, onSaved }: Pr
   const prevStoryRef = useRef<Story>(story);
   const historyUrl = `/api/stories/${date}/${story.index}/history`;
 
-  // Detect external story changes (e.g., Sofia background auto-save updated the grid)
+  // index-changed = chain navigation (clean reset); same index + diff fields =
+  // Sofia background-save (show diff banner). Sofia never reassigns indexes.
   useEffect(() => {
     if (storyEqual(story, prevStoryRef.current)) return;
     const before = { ...prevStoryRef.current };
     prevStoryRef.current = story;
-    // If user has manual edits or is viewing history, don't overwrite
+
+    if (story.index !== before.index) {
+      setDraft({ ...story });
+      setPending(null);
+      saved.current = { ...story };
+      originalStory.current = { ...story };
+      originalRecorded.current = false;
+      setHistory([]);
+      setShowHistory(false);
+      setViewingIdx(null);
+      return;
+    }
+
     if (viewingIdx !== null) return;
     const changedFields = diffFields(before, story);
     if (changedFields.length === 0) return;
@@ -157,6 +181,51 @@ export default function StoryEditor({ story, date, marco, onClose, onSaved }: Pr
     }
     return res.ok;
   }
+
+  // Persist the current draft if dirty, then run `after`. Used by chain
+  // navigation and the chain-fullscreen launch — both close/swap the editor
+  // in a way that would otherwise drop in-progress edits.
+  async function withSavedDraft(after: () => void, errMsg: string) {
+    if (hasDirtyManualEdits) {
+      const ok = await saveStory(draft, "manual");
+      if (!ok) {
+        setError(errMsg);
+        return;
+      }
+      await recordHistory(draft, "Manual edit");
+    }
+    after();
+  }
+
+  async function navigateToChainCard(next: Story) {
+    if (!onNavigateChain || next.index === story.index) return;
+    await withSavedDraft(() => onNavigateChain(next), "Couldn't save before switching cards.");
+  }
+
+  async function openChainFullscreenFromEditor() {
+    if (!onOpenChainFullscreen) return;
+    await withSavedDraft(onOpenChainFullscreen, "Couldn't save before opening chain view.");
+  }
+
+  // Plain const (not useMemo): callbacks close over `draft`, so we want
+  // a fresh closure each render. Identity stability isn't needed downstream.
+  const chainNav = (() => {
+    if (!chainStories?.length || !story.chain || !story.chainRole) return undefined;
+    const position = chainStories.findIndex((s) => s.index === story.index) + 1;
+    if (position === 0) return undefined;
+    const prev = chainStories[position - 2];
+    const next = chainStories[position];
+    return {
+      position,
+      total: chainStories.length,
+      chain: story.chain,
+      role: story.chainRole,
+      onPrev: () => prev && navigateToChainCard(prev),
+      onNext: () => next && navigateToChainCard(next),
+      prevDisabled: !prev,
+      nextDisabled: !next,
+    };
+  })();
 
   function update(field: keyof Story, value: string) {
     setDraft((prev) => {
@@ -418,7 +487,18 @@ export default function StoryEditor({ story, date, marco, onClose, onSaved }: Pr
           story={draft}
           preview={preview}
           onPreviewChange={setPreview}
-          onFullscreen={() => { setFullscreenStory(null); setFullscreen(true); }}
+          onFullscreen={() => {
+            // For chain cards we open the chain fullscreen (preview mode)
+            // instead of the per-card phone overlay — the chain context is
+            // more useful than a zoom on a single card.
+            if (chainStories && chainStories.length > 0 && onOpenChainFullscreen) {
+              openChainFullscreenFromEditor();
+              return;
+            }
+            setFullscreenStory(null);
+            setFullscreen(true);
+          }}
+          chainNav={chainNav}
         />
 
         {/* Mobile tab bar */}
@@ -465,7 +545,7 @@ export default function StoryEditor({ story, date, marco, onClose, onSaved }: Pr
             />
           )}
 
-          <StoryFields draft={draft} onUpdate={update} disabled={isViewingHistory} />
+          <StoryFields draft={draft} onUpdate={update} disabled={isViewingHistory} chainSiblings={chainStories && chainStories.length > 0 ? [draft, ...chainStories.filter((s) => s.index !== draft.index)] : undefined} />
 
           {marco && (marco.reason || marco.url) && (
             <div className="border-t border-border-light pt-3 flex flex-col gap-1">
@@ -526,6 +606,7 @@ export default function StoryEditor({ story, date, marco, onClose, onSaved }: Pr
               onUpdate={handleChatUpdate}
               onReset={handleReset}
               disabled={isViewingHistory}
+              chainSiblings={chainStories?.filter((s) => s.index !== story.index)}
             />
           </div>
         )}

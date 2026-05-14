@@ -15,9 +15,13 @@ interface Props {
   onUpdate: (updates: Partial<Story>) => void;
   onReset: () => void;
   disabled?: boolean;
+  /** Other stories in the same chain (excluding `story`). Threaded into
+      Sofia's prompt as a <ChainContext> block so suggestions stay coherent
+      across the chain. Omit for standalones. */
+  chainSiblings?: Story[];
 }
 
-export default function StoryChat({ story, date, sessionId, onUpdate, onReset, disabled }: Props) {
+export default function StoryChat({ story, date, sessionId, onUpdate, onReset, disabled, chainSiblings }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(() => isStoryChatLoading(date, story.index));
@@ -59,6 +63,7 @@ export default function StoryChat({ story, date, sessionId, onUpdate, onReset, d
     const currentStory = { ...story };
     const currentSessionId = sessionId;
     const currentKey = key;
+    const currentChainSiblings = chainSiblings;
 
     setInput("");
     if (inputRef.current) inputRef.current.style.height = "auto";
@@ -73,6 +78,7 @@ export default function StoryChat({ story, date, sessionId, onUpdate, onReset, d
         message: text,
         story: currentStory,
         sessionId: currentSessionId,
+        chainSiblings: currentChainSiblings,
       });
 
       if (!res.ok) {

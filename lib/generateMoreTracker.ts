@@ -110,7 +110,7 @@ export function clearGenerateMoreError(date: string) {
  *
  * Idempotent: if a request is already running for this date, becomes a no-op.
  */
-export async function runGenerateMore(date: string, count: number, focus: string): Promise<void> {
+export async function runGenerateMore(date: string, count: number, focus: string, suggestChain: boolean): Promise<void> {
   if (entries.has(date)) return;
   const { marcoRate, sofiaRate } = ratesForCount(count);
   entries.set(date, { phase: "marco", progress: 0, tickHandle: null, marcoRate, sofiaRate });
@@ -122,7 +122,7 @@ export async function runGenerateMore(date: string, count: number, focus: string
     const res = await fetch(`/api/generate-more?date=${encodeURIComponent(date)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Requested-With": "fetch" },
-      body: JSON.stringify({ count, focus }),
+      body: JSON.stringify({ count, focus, suggestChain }),
     });
 
     if (!res.ok || !res.body) {

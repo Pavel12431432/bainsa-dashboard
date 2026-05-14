@@ -13,8 +13,24 @@ const AGENT_CLI_NAMES = {
 } as const;
 export type AgentId = keyof typeof AGENT_CLI_NAMES;
 
-export function buildUserMessage(story: Story, instruction: string): string {
+export function buildUserMessage(
+  story: Story,
+  instruction: string,
+  chainSiblings?: Story[],
+): string {
   const bodyMax = story.contentType === "text" ? 300 : 200;
+  const chainBlock = story.chain && story.chainRole && chainSiblings && chainSiblings.length > 0
+    ? `\n<ChainContext>
+You are editing the **${story.chainRole}** of the chain "${story.chain}". The other cards in the chain:
+${chainSiblings.map((s) =>
+    `- [${s.chainRole}] "${s.headline}" — ${s.body.slice(0, 200)}${s.body.length > 200 ? "…" : ""}`,
+  ).join("\n")}
+
+Keep the chain coherent. Hooks tease without resolving. Develop carries substance. Closers tie back to the Bocconi-student reader. Don't repeat what neighboring cards already say.
+</ChainContext>
+`
+    : "";
+
   return `You are editing a BAINSA Instagram story card. Constraints: headline max 80 chars, body max depends on content type (text: 300, bullets: 200, quote: 200).
 Available JSON fields: headline, body, sourceTag, division, cornerAccent, layout, contentType, headlineSize, bodyWeight, textAlign, cornerSize, accentBar, ghostAccent.
 For bullets content type: each bullet line starts with "> ", use sentence case (capitalize first word), 2-3 bullets, each 5-10 words.

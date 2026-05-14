@@ -54,6 +54,8 @@ const KIND_COLORS: Record<LogKind, string> = {
   "adaptive.save": "text-accent-analysis",
   "story.approve": "text-success",
   "story.reject": "text-danger",
+  "story.chain-approve": "text-success",
+  "story.chain-reject": "text-danger",
   "story.edit": "text-brand-white",
   "variants.generate": "text-accent-projects",
   "story.generate-more": "text-accent-projects",
