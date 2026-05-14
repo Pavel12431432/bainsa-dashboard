@@ -5,10 +5,11 @@ interface Props {
 }
 
 const checks: { key: keyof Omit<ComplianceResult, "pass">; label: string }[] = [
-  { key: "colorValid",    label: "Color"    },
-  { key: "headlineOk",    label: "Headline" },
-  { key: "bodyOk",        label: "Body"     },
-  { key: "sourcePresent", label: "Source"   },
+  { key: "colorValid",            label: "Color"    },
+  { key: "headlineOk",            label: "Headline" },
+  { key: "bodyOk",                label: "Body"     },
+  { key: "sourcePresent",         label: "Source"   },
+  { key: "chainAccentConsistent", label: "Chain accent" },
 ];
 
 export default function ComplianceBadge({ result }: Props) {

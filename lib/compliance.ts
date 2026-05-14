@@ -18,7 +18,11 @@ export function bodyMaxChars(contentType: ContentType): number {
   return BODY_MAX[contentType] ?? BODY_MAX.text;
 }
 
-export function checkCompliance(story: Story): ComplianceResult {
+// `chainSiblings`, when provided, is the list of all stories sharing this
+// story's `chain` (including the story itself). Caller filters it; we just
+// compare accent colors across the set. Omit it for standalones or when chain
+// context isn't in scope (the check passes silently in that case).
+export function checkCompliance(story: Story, chainSiblings?: Story[]): ComplianceResult {
   const expectedColor = ACCENT_COLORS[story.division]?.toLowerCase();
   const colorValid = !expectedColor || story.accentColor.toLowerCase() === expectedColor
     ? ok()
@@ -41,11 +45,20 @@ export function checkCompliance(story: Story): ComplianceResult {
     ? ok()
     : fail("Source tag is missing");
 
+  let chainAccentConsistent: ComplianceCheck = ok();
+  if (story.chain && chainSiblings && chainSiblings.length >= 2) {
+    const colors = new Set(chainSiblings.map((s) => s.accentColor.toLowerCase()));
+    if (colors.size > 1) {
+      chainAccentConsistent = fail(`Chain "${story.chain}" mixes ${colors.size} accent colors`);
+    }
+  }
+
   return {
     colorValid,
     headlineOk,
     bodyOk,
     sourcePresent,
-    pass: colorValid.pass && headlineOk.pass && bodyOk.pass && sourcePresent.pass,
+    chainAccentConsistent,
+    pass: colorValid.pass && headlineOk.pass && bodyOk.pass && sourcePresent.pass && chainAccentConsistent.pass,
   };
 }

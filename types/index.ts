@@ -46,6 +46,7 @@ export interface ComplianceResult {
   headlineOk: ComplianceCheck;
   bodyOk: ComplianceCheck;
   sourcePresent: ComplianceCheck;
+  chainAccentConsistent: ComplianceCheck;
   pass: boolean;         // all checks pass
 }
 

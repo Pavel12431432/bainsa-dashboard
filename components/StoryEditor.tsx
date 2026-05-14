@@ -545,7 +545,7 @@ export default function StoryEditor({ story, date, marco, onClose, onSaved, chai
             />
           )}
 
-          <StoryFields draft={draft} onUpdate={update} disabled={isViewingHistory} />
+          <StoryFields draft={draft} onUpdate={update} disabled={isViewingHistory} chainSiblings={chainStories && chainStories.length > 0 ? [draft, ...chainStories.filter((s) => s.index !== draft.index)] : undefined} />
 
           {marco && (marco.reason || marco.url) && (
             <div className="border-t border-border-light pt-3 flex flex-col gap-1">

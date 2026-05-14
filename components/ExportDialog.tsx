@@ -223,8 +223,17 @@ export default function ExportDialog({ stories, approvedIndices = [], stale = []
   // small chip next to the title) and as a callout when posting. Sticky
   // memo keyed on stories — failure set only changes when stories change.
   const failingCompliance = useMemo(() => {
+    const chainSiblings = new Map<string, Story[]>();
+    for (const s of stories) {
+      if (!s.chain) continue;
+      const list = chainSiblings.get(s.chain) ?? [];
+      list.push(s);
+      chainSiblings.set(s.chain, list);
+    }
     const set = new Set<number>();
-    for (const s of stories) if (!checkCompliance(s).pass) set.add(s.index);
+    for (const s of stories) {
+      if (!checkCompliance(s, s.chain ? chainSiblings.get(s.chain) : undefined).pass) set.add(s.index);
+    }
     return set;
   }, [stories]);
   const failsCompliance = (index: number) => failingCompliance.has(index);

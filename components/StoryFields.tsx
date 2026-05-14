@@ -51,10 +51,11 @@ interface Props {
   draft: Story;
   onUpdate: (field: keyof Story, value: string) => void;
   disabled?: boolean;
+  chainSiblings?: Story[];
 }
 
-export default function StoryFields({ draft, onUpdate, disabled }: Props) {
-  const compliance = checkCompliance(draft);
+export default function StoryFields({ draft, onUpdate, disabled, chainSiblings }: Props) {
+  const compliance = checkCompliance(draft, chainSiblings);
   const [showStyle, setShowStyle] = useState(false);
 
   return (

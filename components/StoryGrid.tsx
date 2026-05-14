@@ -371,6 +371,22 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
     [editing?.chain, stories],
   );
 
+  // Chain → siblings index, for the chainAccentConsistent compliance check.
+  const chainSiblingsMap = useMemo(() => {
+    const m = new Map<string, Story[]>();
+    for (const s of stories) {
+      if (!s.chain) continue;
+      const list = m.get(s.chain) ?? [];
+      list.push(s);
+      m.set(s.chain, list);
+    }
+    return m;
+  }, [stories]);
+  const siblingsFor = useCallback(
+    (s: Story) => (s.chain ? chainSiblingsMap.get(s.chain) : undefined),
+    [chainSiblingsMap],
+  );
+
   // Count stories per division for the filter pills
   const divisionCounts: Record<Division, number> = {
     All: stories.length,
@@ -476,7 +492,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
           const approved = approvals.approved.includes(story.index);
           const rejected = approvals.rejected.includes(story.index);
           const isStale = approved && approvalStale.includes(story.index);
-          const compliance = checkCompliance(story);
+          const compliance = checkCompliance(story, siblingsFor(story));
           let state: ChainDotState;
           if (rejected) state = "rejected";
           else if (isStale) state = "stale";
@@ -494,7 +510,7 @@ export default function StoryGrid({ date, initialStories, initialApprovals, init
           opts?: { isTop?: boolean; chainPosition?: number; chainTotal?: number },
         ) => {
           const isTop = opts?.isTop ?? true;
-          const compliance = checkCompliance(story);
+          const compliance = checkCompliance(story, siblingsFor(story));
           const approved = approvals.approved.includes(story.index);
           const rejected = approvals.rejected.includes(story.index);
           const isStale = approved && approvalStale.includes(story.index);
