@@ -9,7 +9,7 @@ const checks: { key: keyof Omit<ComplianceResult, "pass">; label: string }[] = [
   { key: "headlineOk",            label: "Headline" },
   { key: "bodyOk",                label: "Body"     },
   { key: "sourcePresent",         label: "Source"   },
-  { key: "chainAccentConsistent", label: "Chain accent" },
+  { key: "chainConsistency",      label: "Chain"    },
 ];
 
 export default function ComplianceBadge({ result }: Props) {

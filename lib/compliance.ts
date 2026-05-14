@@ -45,11 +45,18 @@ export function checkCompliance(story: Story, chainSiblings?: Story[]): Complian
     ? ok()
     : fail("Source tag is missing");
 
-  let chainAccentConsistent: ComplianceCheck = ok();
+  // Chain identity markers (accent color + corner accent) should be uniform
+  // across all members of a chain. Variation in headlineSize / layout / etc.
+  // is deliberate per-role styling and not checked here.
+  let chainConsistency: ComplianceCheck = ok();
   if (story.chain && chainSiblings && chainSiblings.length >= 2) {
     const colors = new Set(chainSiblings.map((s) => s.accentColor.toLowerCase()));
-    if (colors.size > 1) {
-      chainAccentConsistent = fail(`Chain "${story.chain}" mixes ${colors.size} accent colors`);
+    const corners = new Set(chainSiblings.map((s) => s.cornerAccent));
+    const mismatches: string[] = [];
+    if (colors.size > 1) mismatches.push("accent colors");
+    if (corners.size > 1) mismatches.push("corner accents");
+    if (mismatches.length > 0) {
+      chainConsistency = fail(`Chain "${story.chain}" mixes ${mismatches.join(" and ")}`);
     }
   }
 
@@ -58,7 +65,7 @@ export function checkCompliance(story: Story, chainSiblings?: Story[]): Complian
     headlineOk,
     bodyOk,
     sourcePresent,
-    chainAccentConsistent,
-    pass: colorValid.pass && headlineOk.pass && bodyOk.pass && sourcePresent.pass && chainAccentConsistent.pass,
+    chainConsistency,
+    pass: colorValid.pass && headlineOk.pass && bodyOk.pass && sourcePresent.pass && chainConsistency.pass,
   };
 }
